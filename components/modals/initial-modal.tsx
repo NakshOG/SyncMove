@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "../ui/button";
 import { useEffect, useState } from "react";
+import { FileUpload } from "../ui/file-upload";
 
 const formSchema = z.object({
   name: z.string().min(1, {
@@ -59,7 +60,7 @@ export const InitialModal = () => {
   if (!isMounted) return null;
 
   return (
-    <Dialog open>
+    <Dialog open >
       <DialogContent className="bg-zinc-900 text-white p-0 overflow-hidden">
         <DialogHeader className="pt-8 px-6">
           <DialogTitle className="text-2xl text-center font-bold">
@@ -76,6 +77,25 @@ export const InitialModal = () => {
           className="px-6 pb-6"
         >
           <FieldGroup>
+            {/* IMAGEN*/}
+            <Controller
+              name="imageUrl"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                    <FileUpload
+                    endpoint="ServerImage"
+                    value={field.value}
+                    onchange={field.onChange}
+                    />
+                 {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
+
+            
             {/* SERVER NAME */}
             <Controller
               name="name"
