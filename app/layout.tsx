@@ -17,7 +17,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: LayoutProps<"/">) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <ClerkProvider>
       <html
@@ -33,8 +35,8 @@ export default function RootLayout({
         <body className="min-h-full flex flex-col">
           <ThemeProvider
             attribute="class"
-            forcedTheme="dark"
-            enableSystem
+            defaultTheme="dark"
+            enableSystem={false}
             disableTransitionOnChange
             storageKey="SyncMove"
           >

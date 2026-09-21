@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
-
+import axios from "axios";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,10 +19,10 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "../ui/button";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { FileUpload } from "../ui/file-upload";
 
 const formSchema = z.object({
@@ -37,6 +37,7 @@ const formSchema = z.object({
 
 export const InitialModal = () => {
   const [isMounted, setIsMounted] = useState(false);
+  const router=useRouter();
 
   useEffect(() => {
     setIsMounted(true);
@@ -54,7 +55,15 @@ export const InitialModal = () => {
   const isLoading = form.formState.isSubmitting;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    console.log(values);
+try{
+  await axios.post("/api/servers", values);
+  form.reset();
+  router.refresh();
+  window.location.reload();
+}catch(err){
+console.log("Error creating server:", err);
+}
+
   };
 
   if (!isMounted) return null;
@@ -86,7 +95,7 @@ export const InitialModal = () => {
                     <FileUpload
                     endpoint="ServerImage"
                     value={field.value}
-                    onchange={field.onChange}
+                    onChange={field.onChange}
                     />
                  {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />

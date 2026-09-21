@@ -1,5 +1,4 @@
 import { Redirect } from "next";
-
 import { db } from "@/lib/db";
 import { initialProfile } from "@/lib/initial-profile";
 import { redirect } from "next/navigation";
@@ -24,5 +23,4 @@ if(server){
         <InitialModal/>
     )
 }
-
 export default SetupPage;
