@@ -13,3 +13,4 @@ const MainLayout = async ({ children }: { children: React.ReactNode }) => {
     </div>
   );
 }
+export default MainLayout;

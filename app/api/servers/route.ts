@@ -6,7 +6,7 @@ import { MemberRole } from "@/generated/prisma/enums";
 
 export async function POST(req: Request) {
   try {
-    const { name, imageurl } = await req.json();
+    const { name, imageUrl } = await req.json();
     const profile = await currentProfile();
 
     if (!profile) {
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       data: {
         profileId: profile.id,
         name: name,
-        imageURL: imageurl,
+        imageURL: imageUrl,
         inviteCode: uuidv4(),
         channels: {
           create: [{ name: "general", profileId: profile.id }],
