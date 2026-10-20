@@ -22,9 +22,7 @@ export const ActionTooltip = ({
     return (
         <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger>
-                    {children}
-                </TooltipTrigger>
+              <TooltipTrigger render={children as React.ReactElement} />
                 <TooltipContent side={side} align={align}>
                     <p className="font-semibold text-sm capitalize">
                         {label.toLowerCase()}

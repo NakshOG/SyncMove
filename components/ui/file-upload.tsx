@@ -10,6 +10,39 @@ interface FileUploadProps {
   endpoint: "MessageFile" | "ServerImage";
 }
 
+const compressImage = async (file: File, maxDimension: number) => {
+  if (!file.type.startsWith("image/") || file.type === "image/gif" || file.type === "image/svg+xml") {
+    return file;
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      bitmap.close();
+      return file;
+    }
+
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
+
+    if (!blob || blob.size >= file.size) return file;
+
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.webp`, {
+      type: "image/webp",
+      lastModified: Date.now(),
+    });
+  } catch {
+    return file;
+  }
+};
+
 export const FileUpload = ({
   onChange,
   value,
@@ -44,6 +77,7 @@ export const FileUpload = ({
   return (
     <UploadDropzone
       endpoint={endpoint}
+      onBeforeUploadBegin={(files) => Promise.all(files.map((file) => compressImage(file, endpoint === "ServerImage" ? 1024 : 1920)))}
       onClientUploadComplete={(res) => {
         onChange(res[0]?.url);
       }}

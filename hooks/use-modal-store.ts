@@ -1,17 +1,18 @@
 import { create } from "zustand";
 
-export type ModalType = "createServer";
+export type ModalType = "createServer" | "createChannel" | "serverSettings" | "joinServer";
 
 interface ModalStore {
   type: ModalType | null;
   isOpen: boolean;
-  onOpen: (type: ModalType) => void;
+  data?: { serverId?: string; serverName?: string; serverImageURL?: string };
+  onOpen: (type: ModalType, data?: { serverId?: string; serverName?: string; serverImageURL?: string }) => void;
   onClose: () => void;
 }
 
 export const useModal = create<ModalStore>((set) => ({
   type: null,
   isOpen: false,
-  onOpen: (type) => set({ isOpen: true, type }),
+  onOpen: (type, data) => set({ isOpen: true, type, data }),
   onClose: () => set({ type: null, isOpen: false }),
 }));

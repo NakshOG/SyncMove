@@ -55,8 +55,8 @@ body,
   --color-card: var(--card);
 
   /* Fonts */
-  --font-sans: var(--font-open-sans);
-  --font-heading: var(--font-open-sans);
+  --font-sans: "gg sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-heading: "gg sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-geist-mono);
 
   /* Radius */
@@ -70,10 +70,10 @@ body,
 }
 
 :root {
-  --background: oklch(1 0 0);
+  --background: #ffffff;
   --foreground: oklch(0.145 0 0);
 
-  --card: oklch(1 0 0);
+  --card: #ffffff;
   --card-foreground: oklch(0.145 0 0);
 
   --popover: oklch(1 0 0);
@@ -105,7 +105,7 @@ body,
 
   --radius: 0.625rem;
 
-  --sidebar: oklch(0.985 0 0);
+  --sidebar: #f2f3f5;
   --sidebar-foreground: oklch(0.145 0 0);
 
   --sidebar-primary: oklch(0.205 0 0);
@@ -119,32 +119,32 @@ body,
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
+  --background: #1e1f22;
+  --foreground: #f2f3f5;
 
-  --card: oklch(0.205 0 0);
+  --card: #232428;
   --card-foreground: oklch(0.985 0 0);
 
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
 
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: #5865f2;
+  --primary-foreground: #ffffff;
 
-  --secondary: oklch(0.269 0 0);
+  --secondary: #232428;
   --secondary-foreground: oklch(0.985 0 0);
 
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
+  --muted: #232428;
+  --muted-foreground: #949ba4;
 
-  --accent: oklch(0.269 0 0);
+  --accent: #2b2d31;
   --accent-foreground: oklch(0.985 0 0);
 
   --destructive: oklch(0.704 0.191 22.216);
 
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: #111214;
+  --input: #111214;
+  --ring: #5865f2;
 
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -152,7 +152,7 @@ body,
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
 
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: #1e1f22;
   --sidebar-foreground: oklch(0.985 0 0);
 
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -176,5 +176,241 @@ body,
 
   html {
     @apply font-sans;
+  }
+
+  ::selection {
+    background: #5865f2;
+    color: white;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #1f2023 transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: #1f2023;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: #404249;
+  }
+}
+
+@layer utilities {
+  /* Give the voice/video stage a roomier desktop treatment without changing mobile sizing. */
+  @media (min-width: 768px) {
+    div.max-w-5xl:has(video) {
+      max-width: 80rem;
+      padding: 2.5rem;
+    }
+
+    div.max-w-5xl:has(video) > div.grid {
+      gap: 1.5rem;
+    }
+  }
+
+  div.max-w-5xl:has(video) video {
+    min-height: 14rem;
+  }
+
+  /* Calls use a darker stage and a more intentional Discord-like layout. */
+  div.max-w-5xl:has(video) {
+    background-color: #232428 !important;
+  }
+
+  div.max-w-5xl:has(video) > div.grid > div.border-dashed {
+    display: none;
+  }
+
+  /* Voice calls are presence bubbles, not oversized empty video cards. */
+  div.max-w-5xl:has(video:not([class*="aspect-video"])) > div.grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+  }
+
+  div.max-w-5xl:has(video:not([class*="aspect-video"])) > div.grid > div:not(.border-dashed) {
+    width: clamp(9rem, 18vw, 14rem);
+    max-width: 14rem;
+    aspect-ratio: 1;
+    flex: 0 1 clamp(9rem, 18vw, 14rem);
+    border-radius: 9999px;
+    background: #111214;
+    box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
+  }
+
+  div.max-w-5xl:has(video:not([class*="aspect-video"])) video {
+    display: none;
+    min-height: 0;
+  }
+
+  div.max-w-5xl:has(video:not([class*="aspect-video"])) > div.grid > div > img.absolute.inset-0,
+  div.max-w-5xl:has(video:not([class*="aspect-video"])) > div.grid > div > div.absolute.inset-0 > img {
+    height: 7rem;
+    width: 7rem;
+  }
+
+  /* Desktop video tiles form an open honeycomb instead of two flat rows. */
+  @media (min-width: 768px) {
+    div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-auto-rows: minmax(10rem, 1fr);
+      align-items: center;
+      gap: 1.75rem;
+    }
+
+    div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid > div {
+      min-height: 12rem;
+      height: 100%;
+    }
+
+    div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid > div:nth-child(1) {
+      grid-column: 1 / span 2;
+      grid-row: 1 / span 2;
+      transform: translateY(0.75rem);
+    }
+
+    div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid > div:nth-child(2) {
+      grid-column: 3;
+      grid-row: 1;
+      transform: translateY(-0.5rem);
+    }
+
+    div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid > div:nth-child(3) {
+      grid-column: 3;
+      grid-row: 2;
+      transform: translateY(0.5rem);
+    }
+
+    div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid > div:nth-child(4) {
+      grid-column: 1;
+      grid-row: 3;
+      transform: translateY(-0.5rem);
+    }
+
+    div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid > div:nth-child(5) {
+      grid-column: 2;
+      grid-row: 3;
+      transform: translateY(0.5rem);
+    }
+
+    div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid > div:nth-child(n + 6) {
+      grid-column: 3;
+      grid-row: 3;
+    }
+  }
+}
+
+@layer utilities {
+  /* Audio/video channels use the whole stage; text channels retain their toolbar. */
+  div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:first-child {
+    display: none;
+  }
+
+  div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:nth-child(2) {
+    gap: 2.5rem;
+    padding: 2rem;
+  }
+
+  div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:nth-child(2) > div.max-w-5xl {
+    max-width: none;
+    border: 0;
+    background: transparent !important;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:nth-child(2) > div.max-w-5xl > div.mb-5 {
+    display: none;
+  }
+
+  body.call-room-speaking div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:nth-child(2) > div.max-w-5xl > div.grid > div:first-child {
+    border-color: #23a559;
+    box-shadow: 0 0 0 2px rgb(35 165 89 / 28%), 0 0 18px rgb(35 165 89 / 18%);
+    outline: 2px solid #23a559;
+    outline-offset: 2px;
+  }
+
+  body.call-room-speaking div.max-w-5xl:has(video) > div.grid > div:first-child {
+    border-color: #23a559;
+    outline: 2px solid #23a559;
+    outline-offset: 2px;
+  }
+
+  /* Keep the local speaking state visible when nested media wrappers add their own borders. */
+  body.call-room-speaking div.max-w-5xl:has(video) > div.grid > div:first-child {
+    border-color: #23a559 !important;
+    box-shadow: 0 0 0 3px rgb(35 165 89 / 35%), 0 0 26px rgb(35 165 89 / 28%) !important;
+    outline: 2px solid #23a559 !important;
+    outline-offset: 3px;
+  }
+
+  /* Keep internal transport details out of the user-facing call screen. */
+  div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:nth-child(2) > p {
+    display: none;
+  }
+
+  /* Call stage: transparent framing over a black media surface. */
+  div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:nth-child(2) {
+    background: #000;
+  }
+
+  div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:nth-child(2) > div.max-w-5xl {
+    background: transparent !important;
+  }
+
+  div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:nth-child(2) > div[class*="bg-[#111214]"] {
+    background: rgb(17 18 20 / 72%) !important;
+  }
+
+  /* Every joined video participant is centered in an evenly sized honeycomb. */
+  div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid {
+    align-content: center;
+    align-items: center;
+    gap: 2rem;
+    grid-auto-rows: auto !important;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 22rem)) !important;
+    justify-content: center;
+    width: 100%;
+  }
+
+  div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid > div {
+    aspect-ratio: 16 / 10;
+    height: auto;
+    max-width: 22rem;
+    min-height: 0;
+    transform: none !important;
+    width: 100%;
+  }
+
+  div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid > div:nth-child(even) {
+    transform: translateY(1.25rem) !important;
+  }
+
+  div.max-w-5xl:has(video[class*="aspect-video"]) > div.grid > div:not(.border-dashed) {
+    background: rgb(0 0 0 / 78%);
+  }
+
+  div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:nth-child(2) > div[class*="bg-[#111214]"] {
+    opacity: 0.82;
+    transition: opacity 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:nth-child(2) > div[class*="bg-[#111214]"]:hover,
+  div[class~="bg-[#1e1f22]"][class~="flex-1"][class~="flex-col"] > div:nth-child(2) > div[class*="bg-[#111214]"]:focus-within {
+    opacity: 1;
   }
 }

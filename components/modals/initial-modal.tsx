@@ -22,7 +22,6 @@ import {
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "../ui/button";
-import { use, useEffect, useState } from "react";
 import { FileUpload } from "../ui/file-upload";
 
 const formSchema = z.object({
@@ -36,12 +35,7 @@ const formSchema = z.object({
 });
 
 export const InitialModal = () => {
-  const [isMounted, setIsMounted] = useState(false);
   const router=useRouter();
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -65,8 +59,6 @@ console.log("Error creating server:", err);
 }
 
   };
-
-  if (!isMounted) return null;
 
   return (
     <Dialog open >

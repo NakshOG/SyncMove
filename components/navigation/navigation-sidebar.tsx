@@ -6,7 +6,10 @@ import { NavigationAction } from "./navigation-action";
 import { Separator } from "../ui/separator";
 import { ScrollArea } from "../ui/scroll-area";
 import { NavigationItem } from "./navigation-item";
-import { UserButton } from "@clerk/nextjs";
+import Link from "next/link";
+import { MessageCircle } from "lucide-react";
+import { DiscoverAction } from "./discover-action";
+import { ActionTooltip } from "../action-tooltip";
 
 export const NavigationSidebar = async () => {
   const profile = await currentProfile();
@@ -26,14 +29,21 @@ export const NavigationSidebar = async () => {
   });
 
   return (
-    <div className="space-y-4 flex flex-col items-center h-full text-primary w-full dark:bg-[#1E1F22] py-3">
+    <div className="flex h-full w-full flex-col items-center gap-3 bg-[#1e1f22] py-3 text-[#b5bac1]">
       <NavigationAction />
 
-      <Separator className="!w-3/4 h-px mx-auto bg-zinc-300/70 dark:bg-zinc-700/70" />
+      <ActionTooltip label="Direct messages" side="right" align="center">
+        <Link href="/conversations" aria-label="Direct messages" className="group relative flex h-12 w-12 items-center justify-center rounded-2xl bg-[#313338] text-[#b5bac1] transition-all hover:rounded-xl hover:bg-[#5865f2] hover:text-white">
+          <MessageCircle className="h-5 w-5" />
+        </Link>
+      </ActionTooltip>
+      <DiscoverAction />
 
-      <ScrollArea className="flex-1 w-full">
+      <Separator className="mx-auto h-px !w-3/4 bg-[#35373c]" />
+
+      <ScrollArea className="w-full flex-1">
         {servers.map((server) => (
-          <div key={server.id} className="mb-4">
+          <div key={server.id} className="mb-3">
             <NavigationItem
               id={server.id}
               imageUrl={server.imageURL || ""}
@@ -43,15 +53,7 @@ export const NavigationSidebar = async () => {
         ))}
       </ScrollArea>
 
-      <div className="pb-3 mt-auto flex items-center flex-col gap-y-4">
-        <UserButton
-  appearance={{
-    elements: {
-      avatarBox: "h-[48px] w-[48px]",
-    },
-  }}
-/>
-      </div>
+      <div className="mt-auto pb-2" />
     </div>
   );
 };

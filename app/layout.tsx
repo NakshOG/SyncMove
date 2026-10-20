@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
-import { Open_Sans } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ModalProvider } from "@/components/providers/modal-provider";
-
-const openSans = Open_Sans({
-  variable: "--font-open-sans",
-  subsets: ["latin"],
-});
+import { SocketProvider } from "@/components/providers/socket-provider";
 
 export const metadata: Metadata = {
   title: "SyncMove",
@@ -29,11 +24,10 @@ export default function RootLayout({
         className={cn(
           "h-full",
           "antialiased",
-          openSans.variable,
           "font-sans"
         )}
       >
-        <body className="min-h-full flex flex-col">
+        <body className="h-full flex flex-col">
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"
@@ -41,8 +35,10 @@ export default function RootLayout({
             disableTransitionOnChange
             storageKey="SyncMove"
           >
-            <ModalProvider/>
-            {children}
+            <SocketProvider>
+              <ModalProvider/>
+              {children}
+            </SocketProvider>
           </ThemeProvider>
         </body>
       </html>
