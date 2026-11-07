@@ -5,10 +5,11 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ModalProvider } from "@/components/providers/modal-provider";
 import { SocketProvider } from "@/components/providers/socket-provider";
+import { E2EEProvider } from "@/components/providers/e2ee-provider";
 
 export const metadata: Metadata = {
   title: "SyncMove",
-  description: "Your video chat app",
+  description: "End-to-end encrypted video chat app",
 };
 
 export default function RootLayout({
@@ -36,8 +37,10 @@ export default function RootLayout({
             storageKey="SyncMove"
           >
             <SocketProvider>
-              <ModalProvider/>
-              {children}
+              <E2EEProvider>
+                <ModalProvider/>
+                {children}
+              </E2EEProvider>
             </SocketProvider>
           </ThemeProvider>
         </body>

@@ -146,3 +146,28 @@ model CallSignal {
 
   @@index([roomId, CreatedAt])
 }
+
+// ============================================
+// E2EE Key Bundle Storage
+// ============================================
+
+model KeyBundle {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  
+  // Identity Key (X25519 public key, base64 encoded)
+  identityKey   String   @db.Text
+  
+  // Signed Pre-Key (X25519 public key)
+  signedPreKey  String   @db.Text
+  signature     String   @db.Text  // Ed25519 signature of SPK
+  
+  // One-Time Pre-Key (X25519 public key) - null when exhausted
+  oneTimePreKeyId String?
+  oneTimePreKey   String? @db.Text
+  
+  created       DateTime @default(now())
+  updated       DateTime @updatedAt
+
+  @@index([userId])
+}
