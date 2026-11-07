@@ -1,18 +1,16 @@
 import { NavigationSidebar } from "@/components/navigation/navigation-sidebar";
-import { MobileNavigation } from "@/components/navigation/mobile-navigation";
 
 const MainLayout = async ({ children }: { children: React.ReactNode }) => {
-    return (
+  return (
     <div className="h-full min-h-0">
-      <div className="hidden md:flex h-full w-[72px]
-      z-30 flex-col fixed inset-y-0">
-      <NavigationSidebar />
+      <div className="fixed inset-y-0 z-30 flex h-full w-[72px] flex-col">
+        <NavigationSidebar />
       </div>
-      <main className="h-full min-h-0 pb-16 md:pl-[72px] md:pb-0">
+      <main className="h-full min-h-0 pl-[72px]">
         {children}
       </main>
-      <MobileNavigation />
     </div>
   );
-}
+};
+
 export default MainLayout;

@@ -1,265 +1,217 @@
 # SyncMove - Development TODO
 
-> **Architecture Reference**: See `papers/ZeroKnowledgeE2EEArchitecture.md` for E2EE design based on Signal Protocol.
+## Completed ✅
+- E2EE Core Infrastructure (lib/e2ee/*) - X3DH, Double Ratchet, Key Storage
+- Architecture Paper (papers/ZeroKnowledgeE2EEArchitecture.md)
+
+---
 
 ## 1. BUG FIXES: Video/Audio Transfer Issues
 
 ### 1.1 WebRTC Issues
-- [ ] **ICE Candidate Race Condition**: `pendingCandidates` stored by socketId but signal handler uses `fromId` - potential mismatch
-- [ ] **Missing DTLS-SRTP**: WebRTC peer connection doesn't enforce encrypted transport
-- [ ] **No STUN/TURN fallback**: Only uses public Google STUN, no TURN for NAT traversal
-- [ ] **Signaling channel vulnerability**: Offer/answer/candidate data transmitted in plain text via Socket.IO
+- [ ] **ICE Candidate Race Condition** - `pendingCandidates` uses wrong key (socketId vs fromId)
+- [ ] **DTLS-SRTP Enforcement** - Add mandatory DTLS for encrypted media transport
+- [ ] **TURN Servers** - Add NAT traversal support for corporate firewalls
+- [ ] **WebRTC Certificate** - Generate TLS certificate for DTLS
 
-### 1.2 Socket Issues
-- [ ] **No socket-level authentication**: Auth enforced by data APIs, not socket handshake
-- [ ] **Missing heartbeat/ping-pong**: No client-server keepalive mechanism
-- [ ] **Reconnection race conditions**: Multiple connection attempts possible
+### 1.2 Socket Issues  
+- [ ] **Socket-level Auth** - Validate Clerk session on socket handshake
+- [ ] **Heartbeat/Ping-Pong** - Add keepalive mechanism
+- [ ] **Connection State** - Prevent race conditions on reconnect
 
-### 1.3 Call Flow Issues
-- [ ] **Race in peer creation**: `createPeer` checks `peers.current.has()` but doesn't handle concurrent calls
-- [ ] **No call timeout handling**: Stuck in "waiting" state if peer never joins
-- [ ] **AudioContext not resumed properly**: Browser autoplay policies may block audio
+---
 
-## 2. ZERO-KNOWLEDGE E2EE (Signal Protocol)
+## 2. REMOVE MOBILE-RELATED CODE (Laptop-Only)
 
-> **Reference**: `papers/ZeroKnowledgeE2EEArchitecture.md`  
-> **Based on**: Signal Protocol (https://signal.org/docs/)
-
-### 2.1 Phase 1: Core E2EE Infrastructure ✅
-- [x] **lib/e2ee/x3dh.ts** - X3DH key exchange implementation
-  - Identity Key Pair generation (X25519)
-  - Signed Pre-Key (SPK) with Ed25519 signature
-  - One-Time Pre-Keys (OPKs) batch generation
-  - Shared secret derivation (HKDF-SHA256)
-- [x] **lib/e2ee/double-ratchet.ts** - Double Ratchet algorithm
-  - Root chain ratcheting (HKDF)
-  - Message chain ratcheting (AES-GCM)
-  - Diffie-Hellman ratchet on each message
-  - Skipped message handling (max skip: 1000)
-- [x] **lib/e2ee/key-storage.ts** - Key storage and session management
-  - IndexedDB-backed secure key storage
-  - Session storage with serialization
-  - Bundle storage for peer keys
-  - Password-derived backup/export
-- [x] **lib/e2ee/session.ts** - Session management
-  - Session state machine (pending → established → closed)
-  - Peer session cache
-  - Incoming message decryption queue
-  - Outgoing message encryption queue
-- [x] **lib/e2ee/file-encryption.ts** - File encryption (compress then encrypt)
-- [x] **lib/e2ee/compression.ts** - Client-side compression utilities
-- [x] **lib/e2ee/hkdf.ts** - HKDF-SHA256 implementation
-- [x] **lib/e2ee/sha256.ts** - SHA-256 and utility functions
-- [x] **lib/e2ee/index.ts** - Main exports and quick-start functions
-
-### 2.2 Phase 2: Messaging Integration
-- [ ] **Update Message type** - Add encrypted content field
-  - Prisma schema: `Message.encryptedContent`
-  - Client: Store ciphertext + IV
-- [ ] **Encrypt before send** - Hook into chat-input
-  ```typescript
-  // Before API call:
-  const ciphertext = await encryptMessage(session, content);
-  await fetch('/api/messages', {
-    body: JSON.stringify({ channelId, content: ciphertext })
-  });
-  ```
-- [ ] **Decrypt on receive** - Hook into chat-messages
-  ```typescript
-  // On socket message:
-  const plaintext = await decryptMessage(session, message.encryptedContent);
-  render(plaintext);
-  ```
-- [ ] **Key Bundle API** - Endpoints for key exchange
-  - `GET /api/keys/:userId` - Download peer's bundle
-  - `POST /api/keys` - Upload own bundle
-  - `DELETE /api/keys/:keyId` - Revoke compromised keys
-- [ ] **Pre-key Storage in Prisma**
-  - Add `KeyBundle` model
-  - Store: userId, ik, spk, spkSignature, opks[]
-  - One-time use, delete after retrieval
-
-### 2.3 Phase 3: Group Encryption (Sender Keys)
-- [ ] **Sender Key Distribution**
-  - Each member generates sender key
-  - Encrypted to each recipient's session key
-  - Re-encrypted on member join/leave
-- [ ] **Group Message Encryption**
-  - Encrypt with sender key
-  - No per-recipient encryption overhead
-- [ ] **Group Key Rotation**
-  - Triggered on: member join, member leave, periodic
-  - New sender key distributed to remaining members
-
-### 2.4 Phase 4: File Encryption (Compress Then Encrypt)
-> **Approach**: Client-side compression → AES-GCM encryption → Upload encrypted blob
-- [ ] **lib/e2ee/file-encryption.ts**
-  ```typescript
-  async function encryptFile(file: File): Promise<EncryptedFile> {
-    // 1. Compress with CompressionStream API
-    const compressed = await compress(file.stream());
-    
-    // 2. Generate random key (256-bit) + IV (96-bit)
-    const key = await crypto.subtle.generateKey(
-      { name: "AES-GCM", length: 256 }, true, ["encrypt"]
-    );
-    
-    // 3. Encrypt compressed data
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ciphertext = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv }, key, compressed
-    );
-    
-    // 4. Export key (encrypted with recipient's session key)
-    const encryptedKey = await encryptKeyForRecipients(key, recipients);
-    
-    return { ciphertext, iv, encryptedKey, metadata };
-  }
-  ```
-- [ ] **lib/e2ee/compression.ts**
-  - `CompressionStream` API (native browser)
-  - Fallback: pako/zlib for broader support
-  - Target: 50-70% reduction for text/media
-
-### 2.5 Phase 5: WebRTC Media Encryption
-- [ ] **DTLS-SRTP enforcement** - Mandatory
-  ```typescript
-  const pc = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    // FORCE DTLS
-    certificates: [await createTLSCertificate()],
-  });
-  pc.setConfiguration({
-    ...pc.getConfiguration(),
-    // Explicitly require encrypted transport
-    iceTransportPolicy: "all",
-  });
-  // Ensure SRTP is negotiated
-  ```
-- [ ] **SRTP key negotiation** - WebRTC default, verify enabled
-- [ ] **Certificate pinning** (optional) - Verify DTLS fingerprints
-- [ ] **TURN servers** - Add for NAT traversal
-  ```typescript
-  const iceServers = [
-    { urls: "stun:stun.l.google.com:19302" },
-    {
-      urls: "turn:your-turn-server.com:3478",
-      username: process.env.TURN_USERNAME,
-      credential: process.env.TURN_PASSWORD,
-    },
-  ];
-  ```
-
-### 2.6 Key Management & Storage
-- [ ] **IndexedDB key storage** - Never localStorage
-  ```typescript
-  // lib/e2ee/key-storage.ts
-  class SecureKeyStorage {
-    private db: Promise<IDBDatabase>;
-    
-    async storeKey(keyId: string, key: CryptoKey): Promise<void> {
-      const exported = await crypto.subtle.exportKey("jwk", key);
-      await this.db.then(db => 
-        db.transaction("keys", "readwrite").objectStore("keys")
-          .put({ keyId, key: exported, created: Date.now() })
-      );
-    }
-    
-    async getKey(keyId: string): Promise<CryptoKey | null> {
-      const stored = await this.db.then(db =>
-        db.transaction("keys").objectStore("keys").get(keyId)
-      );
-      if (!stored) return null;
-      return await crypto.subtle.importKey(
-        "jwk", stored.key, { name: "X25519" }, true, ["deriveBits"]
-      );
-    }
-  }
-  ```
-- [ ] **Password-derived backup** - Export encrypted with KDF
-- [ ] **Key rotation schedule**
-  - Identity Key: Manual (rarely needed)
-  - Signed Pre-Key: Rotate weekly
-  - One-Time Pre-Keys: Replenish when < 20 remaining
-- [ ] **Compromise recovery**
-  - Device reset → Generate new keys
-  - Server query → Invalidate old sessions
-  - Notify peers → Re-establish sessions
-
-## 3. REMOVE MOBILE-RELATED CODE
-
-### 3.1 Navigation
+### 2.1 Delete Files
 - [ ] Delete `components/navigation/mobile-navigation.tsx`
-- [ ] Remove `md:hidden` classes throughout codebase
-- [ ] Simplify layout to single sidebar approach
 
-### 3.2 Responsive Design
-- [ ] Remove `md:flex` conditional layouts
-- [ ] Remove mobile-specific padding (`pb-16`, `sm:px-6`)
-- [ ] Use fixed desktop-first breakpoints
-- [ ] Remove `100dvh` dynamic viewport handling
+### 2.2 Layout Simplification
+- [ ] `app/(main)/(routes)/layout.tsx` - Remove mobile nav, use fixed sidebar
+- [ ] `app/(main)/(routes)/servers/[serverID]/layout.tsx` - Remove responsive sidebar
+- [ ] `app/(main)/(routes)/servers/[serverID]/channels/[channelID]/page.tsx` - Fix height calculation
 
-### 3.3 Components to Simplify
-- [ ] `app/(main)/(routes)/layout.tsx` - Remove mobile layout
-- [ ] `app/(main)/(routes)/servers/[serverID]/layout.tsx` - Remove mobile sidebar
-- [ ] Any mobile-specific CSS utilities
+### 2.3 Remove Responsive Classes
+- [ ] Remove all `md:hidden` classes
+- [ ] Remove all `md:flex` conditional layouts  
+- [ ] Remove `pb-16` mobile padding
+- [ ] Remove `sm:px-6` desktop overrides
+- [ ] Use fixed `100vh` height
 
-## 4. PROFESSIONAL IMPROVEMENTS
+---
 
-### 4.1 Authentication & Security
-- [ ] **Socket-level auth**: Validate Clerk session on socket handshake
-- [ ] **Rate limiting**: Add per-user rate limits on socket events
-- [ ] **Input validation**: Sanitize all message content on server
-- [ ] **XSS prevention**: Content Security Policy headers
+## 3. UI/UX IMPROVEMENTS
 
-### 4.2 Error Handling & Logging
-- [ ] **Centralized error boundary**: Wrap components with error boundaries
-- [ ] **Structured logging**: JSON logs with request IDs
-- [ ] **Client-side error reporting**: Send errors to server for monitoring
-- [ ] **Fallback UI**: Graceful degradation when WebRTC fails
+### 3.1 Z-Index Layering (Fix Modal/Popover Stacking)
+| Location | Current | Fixed |
+|----------|---------|-------|
+| Emoji picker | z-20 | z-50 |
+| Settings dropdown | z-30 | z-50 |
+| All modals | varies | z-50 |
+| Tooltips | z-40 | z-60 |
 
-### 4.3 Performance
-- [ ] **Lazy load call components**: Only load WebRTC when user joins call
-- [ ] **Optimistic updates**: Instant message display before server confirmation
-- [ ] **Message pagination**: Improve infinite scroll performance
-- [ ] **Socket event batching**: Batch multiple events in single packet
+### 3.2 Border Radius Consistency
+- **Standard**: All interactive elements use `rounded-xl`
+- **Modals**: `rounded-2xl` (unified with nav items)
+- **Buttons**: `rounded-xl`
+- **Inputs**: `rounded-xl`
+- **Cards**: `rounded-xl` or `rounded-2xl`
 
-### 4.4 Call Quality
-- [ ] **Adaptive bitrate**: Adjust quality based on bandwidth
-- [ ] **Bandwidth probing**: Initial quality estimation
-- [ ] **Codec negotiation**: Explicit VP8/VP9/H.264 preference
-- [ ] **Connection quality indicator**: Show ping/latency to peers
+### 3.3 Interactive States
+- [ ] Add proper hover transitions on all interactive elements
+- [ ] Add focus-visible rings for keyboard navigation
+- [ ] Add active/pressed states for buttons
+- [ ] Fix emoji picker hover feedback
 
-## 5. DEPENDENCY ADDITIONS
-- [ ] `@whisper/encrypted-messaging` or implement Double Ratchet manually
-- `ffmpeg-wasm` for client-side compression (optional)
-- `@types/ws` if using raw WebSocket (not Socket.IO)
+### 3.4 Accessibility
+- [ ] Add `aria-label` to all icon-only buttons
+- [ ] Add `aria-label` to navigation items
+- [ ] Add keyboard shortcuts documentation
+- [ ] Add focus management for modals
 
-## 6. TESTING
-- [ ] Unit tests for encryption utilities
-- [ ] Integration tests for WebRTC call flow
-- [ ] E2E tests for message sending/receiving
-- [ ] Performance tests for large file transfers
+---
+
+## 4. E2EE INTEGRATION
+
+### 4.1 Key Bundle API
+- [ ] `app/api/keys/route.ts` - Upload key bundle
+- [ ] `app/api/keys/[userId]/route.ts` - Download peer's bundle
+- [ ] `app/api/keys/[keyId]/route.ts` - Revoke keys
+
+### 4.2 Prisma Schema Update
+```prisma
+model KeyBundle {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  identityKey   String   @db.Text
+  signedPreKey  String   @db.Text
+  signature     String   @db.Text
+  oneTimePreKey String?  @db.Text
+  created       DateTime @default(now())
+}
+```
+
+### 4.3 Message Hooks
+- [ ] Encrypt in chat-input before send
+- [ ] Decrypt in chat-messages on receive
+- [ ] Handle encrypted file attachments
+- [ ] Graceful fallback for non-E2EE messages
+
+---
+
+## 5. COMPONENT IMPROVEMENTS
+
+### 5.1 CallRoom (Video/Audio)
+- [ ] Fix border radius consistency
+- [ ] Improve participant tile layout
+- [ ] Add connection quality indicator
+- [ ] Add error boundary for WebRTC failures
+
+### 5.2 Chat Messages
+- [ ] Improve message bubble design
+- [ ] Add hover actions consistently
+- [ ] Fix load older messages button styling
+- [ ] Improve search results display
+
+### 5.3 Chat Input
+- [ ] Fix z-index for emoji picker
+- [ ] Add emoji category tabs
+- [ ] Improve file upload progress indicator
+- [ ] Add typing indicator
+
+### 5.4 Navigation
+- [ ] Remove mobile navigation completely
+- [ ] Improve active state indicators
+- [ ] Add keyboard navigation
+- [ ] Smooth hover transitions
+
+---
+
+## 6. VISUAL DESIGN SYSTEM
+
+### 6.1 Color Consistency
+| Element | Current | Standard |
+|---------|---------|----------|
+| Background | varies | #1e1f22 (dark) |
+| Surface | varies | #2b2d31 |
+| Hover | varies | #35373c |
+| Border | varies | #404249 |
+| Primary | varies | #5865f2 |
+| Text primary | varies | #f2f3f5 |
+| Text secondary | varies | #949ba4 |
+
+### 6.2 Spacing System
+- Base unit: 4px (0.25rem)
+- xs: 4px (0.25rem) - gap-1
+- sm: 8px (0.5rem) - gap-2
+- md: 12px (0.75rem) - gap-3
+- lg: 16px (1rem) - gap-4
+- xl: 24px (1.5rem) - gap-6
+- 2xl: 32px (2rem) - gap-8
+
+### 6.3 Typography
+- Headings: font-semibold, text-white
+- Body: text-[#f2f3f5]
+- Muted: text-[#949ba4]
+- Links: text-[#a5b4fc]
+
+---
+
+## Implementation Order
+
+1. **Week 1: Core Bug Fixes**
+   - WebRTC ICE fix
+   - DTLS enforcement  
+   - Socket auth
+   - Mobile removal (2-3 days)
+
+2. **Week 2: UI Polish**
+   - Z-index fixes
+   - Border radius consistency
+   - Interactive states
+   - Accessibility
+
+3. **Week 3: E2EE Integration**
+   - Key bundle API
+   - Message hooks
+   - Database migration
+
+4. **Week 4: Polish & Testing**
+   - Visual design system
+   - Component improvements
+   - Testing
 
 ---
 
 ## Notes
 
-### Priority Order
-1. **P0 - Critical Bugs**: ICE candidate issues, DTLS enforcement
-2. **P1 - Security**: Basic E2EE for messages
-3. **P2 - UX**: Remove mobile code, improve error handling
-4. **P3 - Polish**: Performance, testing, advanced features
+### Design Principles
+- **Desktop-first**: Remove all mobile responsive code
+- **Consistency**: Unified border-radius, spacing, colors
+- **Accessibility**: Full keyboard navigation, ARIA labels
+- **Performance**: Lazy load heavy components
 
-### Implementation Approach
-- Encryption should be **opt-in per server/channel** initially
-- Backward compatible - plain text for legacy clients
-- Key exchange during message send, not fetch
-- Progressive disclosure of encryption features
+### File Changes Summary
+| Action | Files |
+|--------|-------|
+| Delete | mobile-navigation.tsx |
+| Modify | layout.tsx (x3) |
+| Modify | call-room.tsx |
+| Modify | chat-input.tsx |
+| Modify | chat-messages.tsx |
+| Modify | navigation-*.tsx (x4) |
+| Modify | modals (x5) |
+| New | api/keys/* |
 
-### Estimated Complexity
-- Basic E2EE: ~2-3 weeks
-- Group encryption: ~1-2 weeks  
-- File encryption: ~1 week
-- Mobile removal: ~2-3 days
-- Bug fixes: ~1 week
+### Testing Checklist
+- [ ] Video call connects successfully
+- [ ] Audio call connects successfully  
+- [ ] ICE candidates exchanged correctly
+- [ ] DTLS encryption active
+- [ ] Mobile nav completely removed
+- [ ] No responsive breakpoints remain
+- [ ] All z-index layers correct
+- [ ] Border radius consistent
+- [ ] Hover states work
+- [ ] Focus states work
+- [ ] Aria labels present

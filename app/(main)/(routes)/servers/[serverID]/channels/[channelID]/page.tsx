@@ -44,8 +44,28 @@ const ChannelPage = async ({
   }
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] min-h-0 flex-col bg-white dark:bg-[#1e1f22] md:h-[100dvh]">
-      {channel.type === ChannelType.TEXT ? <><ChatHeader name={channel.name} type={channel.type} /><ChatMessages channelId={channel.id} profileId={profile.id} /></> : <CallRoom roomId={channel.id} video={channel.type === ChannelType.VIDEO} currentParticipant={{ id: profile.id, name: profile.name, imageUrl: profile.imageUrl }} participants={channel.server.members.map((member) => ({ id: member.profileId, name: member.profile.name, imageUrl: member.profile.imageUrl }))} />}
+    <div className="flex h-screen min-h-0 flex-col bg-white dark:bg-[#1e1f22]">
+      {channel.type === ChannelType.TEXT ? (
+        <>
+          <ChatHeader name={channel.name} type={channel.type} />
+          <ChatMessages channelId={channel.id} profileId={profile.id} />
+        </>
+      ) : (
+        <CallRoom
+          roomId={channel.id}
+          video={channel.type === ChannelType.VIDEO}
+          currentParticipant={{
+            id: profile.id,
+            name: profile.name,
+            imageUrl: profile.imageUrl,
+          }}
+          participants={channel.server.members.map((member) => ({
+            id: member.profileId,
+            name: member.profile.name,
+            imageUrl: member.profile.imageUrl,
+          }))}
+        />
+      )}
     </div>
   );
 };

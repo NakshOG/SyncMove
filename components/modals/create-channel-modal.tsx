@@ -12,7 +12,9 @@ export const CreateChannelModal = () => {
   const [name, setName] = useState("");
   const [channelType, setChannelType] = useState("TEXT");
   const [loading, setLoading] = useState(false);
+
   if (!isOpen || type !== "createChannel" || !data?.serverId) return null;
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
@@ -20,5 +22,49 @@ export const CreateChannelModal = () => {
     if (response.ok) { setName(""); onClose(); router.refresh(); }
     setLoading(false);
   };
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><form onSubmit={submit} className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-[#313338]"><h2 className="text-xl font-bold">Create channel</h2><p className="mt-1 text-sm text-zinc-500">Add a new space for your server.</p><Input className="mt-5" value={name} onChange={(event) => setName(event.target.value)} placeholder="channel-name" autoFocus /><select value={channelType} onChange={(event) => setChannelType(event.target.value)} className="mt-3 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="TEXT">Text</option><option value="AUDIO">Voice</option><option value="VIDEO">Video</option></select><div className="mt-6 flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit" disabled={loading || !name.trim()}>{loading ? "Creating…" : "Create channel"}</Button></div></form></div>;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <form onSubmit={submit} className="w-full max-w-md rounded-xl bg-[#2b2d31] p-6 shadow-2xl border border-white/5">
+        <h2 className="text-xl font-bold text-white">Create channel</h2>
+        <p className="mt-1 text-sm text-[#949ba4]">Add a new space for your server.</p>
+        
+        <Input 
+          className="mt-5 rounded-xl bg-[#383a40] border-0 focus-visible:ring-1 focus-visible:ring-[#5865f2] text-white placeholder:text-[#949ba4]" 
+          value={name} 
+          onChange={(event) => setName(event.target.value)} 
+          placeholder="channel-name" 
+          autoFocus 
+        />
+        
+        <select 
+          value={channelType} 
+          onChange={(event) => setChannelType(event.target.value)}
+          className="mt-3 h-11 w-full rounded-xl border-0 bg-[#383a40] px-3 text-sm text-white focus-visible:ring-1 focus-visible:ring-[#5865f2]"
+        >
+          <option value="TEXT">Text</option>
+          <option value="AUDIO">Voice</option>
+          <option value="VIDEO">Video</option>
+        </select>
+        
+        <div className="mt-6 flex justify-end gap-2">
+          <Button 
+            type="button" 
+            variant="ghost" 
+            onClick={onClose}
+            className="rounded-xl hover:bg-[#35373c] text-[#b5bac1] hover:text-white"
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            disabled={loading || !name.trim()}
+            className="rounded-xl bg-[#5865f2] hover:bg-[#4752c4] text-white"
+          >
+            {loading ? "Creating…" : "Create channel"}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
 };

@@ -21,6 +21,7 @@ export const NavigationItem = ({
 }: NavigationItemProps) => {
   const params = useParams();
   const router = useRouter();
+  
   return (
     <ActionTooltip side="right" align="center" label={name}>
       <div
@@ -29,7 +30,7 @@ export const NavigationItem = ({
       >
         <div
           className={cn(
-            "absolute left-0 rounded-r-full bg-white transition-all w-[4px]",
+            "absolute left-0 rounded-r-full bg-[#5865f2] transition-all w-[4px]",
             params?.serverID !== id && "group-hover:h-[20px]",
             params?.serverID === id ? "h-[36px]" : "h-[8px]"
           )}
@@ -37,7 +38,7 @@ export const NavigationItem = ({
 
         <div
           className={cn(
-            "relative mx-3 flex h-12 w-12 overflow-hidden rounded-2xl bg-[#313338] transition-all group-hover:rounded-xl"
+            "relative mx-3 flex h-12 w-12 overflow-hidden rounded-xl bg-[#313338] transition-all group-hover:rounded-xl"
           )}
         >
           <Image

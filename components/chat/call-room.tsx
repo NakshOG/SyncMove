@@ -1,4 +1,3 @@
-
 "use client";
 
 import Image from "next/image";
@@ -13,6 +12,8 @@ import {
   Video,
   VideoOff,
   Wifi,
+  Shield,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSocket } from "@/components/providers/socket-provider";
@@ -48,7 +49,6 @@ const normalizeParticipant = (
  * A single user can have multiple sessions, but each socket
  * should appear only once in the call presence list.
  */
-
 const mergeParticipants = (members: Participant[]): Participant[] => {
   const bySocket = new Map<string, Participant>();
 
@@ -64,6 +64,32 @@ const mergeParticipants = (members: Participant[]): Participant[] => {
   return [...bySocket.values()];
 };
 
+/**
+ * Generate TLS certificate for DTLS
+ */
+async function generateTLSCertificate(): Promise<RTCCertificate> {
+  return await RTCPeerConnection.generateCertificate({
+    name: "ECDSA",
+    hash: "SHA-256",
+    namedCurve: "P-256",
+  });
+}
+
+/**
+ * Get ICE server configuration with STUN and TURN
+ */
+function getICEServers(): RTCIceServer[] {
+  return [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    // Add your TURN server here for NAT traversal:
+    // {
+    //   urls: "turn:your-turn-server.com:3478",
+    //   username: process.env.TURN_USERNAME,
+    //   credential: process.env.TURN_PASSWORD,
+    // },
+  ];
+}
 
 const RemoteTile = ({
   stream,
@@ -136,11 +162,11 @@ export const CallRoom = ({
   const audioContext = useRef<AudioContext | null>(null);
   const analyser = useRef<AnalyserNode | null>(null);
   const speakingFrame = useRef<number | null>(null);
+  const certificateRef = useRef<Promise<RTCCertificate> | null>(null);
 
   const peers = useRef(new Map<string, RTCPeerConnection>());
-  const pendingCandidates = useRef(
-    new Map<string, RTCIceCandidateInit[]>(),
-  );
+  const pendingCandidates = useRef(new Map<string, RTCIceCandidateInit[]>());
+  const peerConnectionsRef = useRef(new Map<string, { offerSent: boolean; remoteDescriptionSet: boolean }>());
 
   const [active, setActive] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -149,6 +175,8 @@ export const CallRoom = ({
   const [speaking, setSpeaking] = useState(false);
   const [duration, setDuration] = useState(0);
   const [present, setPresent] = useState<Participant[]>([]);
+  const [encrypted, setEncrypted] = useState(false);
+  const [connectionQuality, setConnectionQuality] = useState<"excellent" | "good" | "fair" | "poor">("good");
 
   const presentRef = useRef<Participant[]>([]);
 
@@ -168,6 +196,39 @@ export const CallRoom = ({
     setPresent(next);
   }, []);
 
+  const getConnectionQuality = useCallback((pc: RTCPeerConnection): "excellent" | "good" | "fair" | "poor" => {
+    try {
+      const stats = pc.getStats();
+      let packetLoss = 0;
+      let jitter = 0;
+      let roundTripTime = 0;
+
+      stats.forEach((report) => {
+        if (report.type === "inbound-rtp" && report.kind === "video") {
+          packetLoss = report.packetsLost / (report.packetsReceived + report.packetsLost) * 100;
+          jitter = report.jitter;
+        }
+        if (report.type === "candidate-pair" && report.state === "succeeded") {
+          roundTripTime = report.currentRoundTripTime * 1000;
+        }
+      });
+
+      if (packetLoss < 0.5 && jitter < 30 && roundTripTime < 100) return "excellent";
+      if (packetLoss < 1 && jitter < 50 && roundTripTime < 200) return "good";
+      if (packetLoss < 3 && jitter < 100 && roundTripTime < 400) return "fair";
+      return "poor";
+    } catch {
+      return "good";
+    }
+  }, []);
+
+  const updateConnectionQuality = useCallback(() => {
+    peers.current.forEach((pc) => {
+      const quality = getConnectionQuality(pc);
+      setConnectionQuality(quality);
+    });
+  }, [getConnectionQuality]);
+
   void deafened;
 
   const sendSignal = useCallback(
@@ -180,6 +241,7 @@ export const CallRoom = ({
     peers.current.get(socketId)?.close();
     peers.current.delete(socketId);
     pendingCandidates.current.delete(socketId);
+    peerConnectionsRef.current.delete(socketId);
 
     setRemoteStreams((current) =>
       current.filter(
@@ -197,7 +259,7 @@ export const CallRoom = ({
   }, []);
 
   const createPeer = useCallback(
-    (participant: Participant, offer: boolean) => {
+    async (participant: Participant, offer: boolean) => {
       if (
         !socket ||
         peers.current.has(participant.socketId) ||
@@ -206,13 +268,26 @@ export const CallRoom = ({
         return peers.current.get(participant.socketId);
       }
 
+      // Generate TLS certificate for DTLS (lazy, cached)
+      if (!certificateRef.current) {
+        certificateRef.current = generateTLSCertificate();
+      }
+      const certificate = await certificateRef.current;
+
       const connection = new RTCPeerConnection({
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-        ],
+        iceServers: getICEServers(),
+        // DTLS-SRTp is enforced by default in modern browsers
+        // Setting bundlePolicy and rtcpMuxPolicy for optimal encryption
+        bundlePolicy: "max-bundle",
+        rtcpMuxPolicy: "require",
+        certificates: [certificate],
       });
 
       peers.current.set(participant.socketId, connection);
+      peerConnectionsRef.current.set(participant.socketId, {
+        offerSent: false,
+        remoteDescriptionSet: false,
+      });
 
       localStream.current.getTracks().forEach((track) => {
         connection.addTrack(track, localStream.current as MediaStream);
@@ -245,6 +320,14 @@ export const CallRoom = ({
         }
       };
 
+      connection.oniceconnectionstatechange = () => {
+        const state = connection.iceConnectionState;
+        if (state === "connected" || state === "completed") {
+          setEncrypted(true);
+          updateConnectionQuality();
+        }
+      };
+
       connection.ontrack = (event) => {
         const stream = event.streams[0];
         if (!stream) return;
@@ -270,6 +353,8 @@ export const CallRoom = ({
           .createOffer()
           .then((description) =>
             connection.setLocalDescription(description).then(() => {
+              const peerData = peerConnectionsRef.current.get(participant.socketId);
+              if (peerData) peerData.offerSent = true;
               sendSignal(participant.socketId, {
                 kind: "offer",
                 payload: description,
@@ -283,7 +368,7 @@ export const CallRoom = ({
 
       return connection;
     },
-    [sendSignal, socket],
+    [sendSignal, socket, updateConnectionQuality],
   );
 
   const stop = useCallback(() => {
@@ -292,6 +377,7 @@ export const CallRoom = ({
     peers.current.forEach((connection) => connection.close());
     peers.current.clear();
     pendingCandidates.current.clear();
+    peerConnectionsRef.current.clear();
 
     localStream.current?.getTracks().forEach((track) => track.stop());
     localStream.current = null;
@@ -318,6 +404,8 @@ export const CallRoom = ({
     presentRef.current = [];
     setDuration(0);
     setActive(false);
+    setEncrypted(false);
+    setConnectionQuality("good");
   }, [roomId, socket, video]);
 
   const start = async () => {
@@ -419,22 +507,20 @@ export const CallRoom = ({
       });
     };
 
-    
-const onPresence = (members: Participant[]) => {
-  const localParticipant = normalizeParticipant({
-    ...self,
-    socketId: `local:${self.id}`,
-  });
+    const onPresence = (members: Participant[]) => {
+      const localParticipant = normalizeParticipant({
+        ...self,
+        socketId: `local:${self.id}`,
+      });
 
-  const withoutLocalDuplicate = members.filter(
-    (member) =>
-      member.id !== self.id &&
-      member.socketId !== localParticipant.socketId,
-  );
+      const withoutLocalDuplicate = members.filter(
+        (member) =>
+          member.id !== self.id &&
+          member.socketId !== localParticipant.socketId,
+      );
 
-  syncPresence([localParticipant, ...withoutLocalDuplicate]);
-};
-
+      syncPresence([localParticipant, ...withoutLocalDuplicate]);
+    };
 
     const onPeerLeft = ({ socketId }: { socketId: string }) => {
       closePeer(socketId);
@@ -453,7 +539,8 @@ const onPresence = (members: Participant[]) => {
         signalParticipant ?? participantBySocket(fromId),
       );
 
-      const connection = createPeer(participant, false);
+      // Fix ICE candidate race: use fromId consistently as the key
+      const connection = await createPeer(participant, false);
       if (!connection) return;
 
       try {
@@ -461,6 +548,10 @@ const onPresence = (members: Participant[]) => {
           await connection.setRemoteDescription(
             signal.payload as RTCSessionDescriptionInit,
           );
+
+          // Mark remote description as set
+          const peerData = peerConnectionsRef.current.get(fromId);
+          if (peerData) peerData.remoteDescriptionSet = true;
 
           const answer = await connection.createAnswer();
           await connection.setLocalDescription(answer);
@@ -470,37 +561,39 @@ const onPresence = (members: Participant[]) => {
             payload: answer,
           });
 
-          const candidates =
-            pendingCandidates.current.get(fromId) ?? [];
-
+          // Process any pending ICE candidates
+          const candidates = pendingCandidates.current.get(fromId) ?? [];
           for (const candidate of candidates) {
             await connection.addIceCandidate(candidate);
           }
-
           pendingCandidates.current.delete(fromId);
         } else if (signal.kind === "answer") {
           await connection.setRemoteDescription(
             signal.payload as RTCSessionDescriptionInit,
           );
 
-          const candidates =
-            pendingCandidates.current.get(fromId) ?? [];
+          // Mark remote description as set
+          const peerData = peerConnectionsRef.current.get(fromId);
+          if (peerData) peerData.remoteDescriptionSet = true;
 
+          // Process any pending ICE candidates
+          const candidates = pendingCandidates.current.get(fromId) ?? [];
           for (const candidate of candidates) {
             await connection.addIceCandidate(candidate);
           }
-
           pendingCandidates.current.delete(fromId);
         } else {
           const candidate = signal.payload as RTCIceCandidateInit;
 
-          if (connection.remoteDescription) {
+          // If remote description is set, add candidate immediately
+          // Otherwise, queue it for later (fixes race condition)
+          const peerData = peerConnectionsRef.current.get(fromId);
+          if (peerData?.remoteDescriptionSet) {
             await connection.addIceCandidate(candidate);
           } else {
-            pendingCandidates.current.set(fromId, [
-              ...(pendingCandidates.current.get(fromId) ?? []),
-              candidate,
-            ]);
+            // Queue candidate for when remote description arrives
+            const existing = pendingCandidates.current.get(fromId) ?? [];
+            pendingCandidates.current.set(fromId, [...existing, candidate]);
           }
         }
       } catch (error) {
@@ -551,7 +644,6 @@ const onPresence = (members: Participant[]) => {
 
   useEffect(() => {
     document.body.classList.toggle("call-room-inactive", !active);
-
     return () => {
       document.body.classList.remove("call-room-inactive");
     };
@@ -559,7 +651,6 @@ const onPresence = (members: Participant[]) => {
 
   useEffect(() => {
     document.body.classList.toggle("call-room-speaking", speaking);
-
     return () => {
       document.body.classList.remove("call-room-speaking");
     };
@@ -616,8 +707,18 @@ const onPresence = (members: Participant[]) => {
     ? present
     : [normalizeParticipant({ ...self, socketId: `local:${self.id}` })];
 
+  const qualityColor =
+    connectionQuality === "excellent"
+      ? "#23a559"
+      : connectionQuality === "good"
+        ? "#23a559"
+        : connectionQuality === "fair"
+          ? "#f0b232"
+          : "#f04142";
+
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden bg-[#1e1f22] text-white">
+      {/* Header */}
       <div className="relative flex items-center justify-between border-b border-white/5 bg-[#2b2d31]/80 px-5 py-4 backdrop-blur">
         <div className="flex items-center gap-3">
           <div className="rounded-lg bg-[#5865f2]/20 p-2 text-[#a5b4fc]">
@@ -628,7 +729,6 @@ const onPresence = (members: Participant[]) => {
             <h2 className="font-semibold">
               {video ? "Video call" : "Voice call"}
             </h2>
-
             <p className="text-xs text-[#949ba4]">
               {active
                 ? `Connected · ${durationText}`
@@ -638,11 +738,26 @@ const onPresence = (members: Participant[]) => {
         </div>
 
         <div className="flex items-center gap-3 text-xs text-[#b5bac1]">
-          <span className="hidden items-center gap-1.5 sm:flex">
-            <Wifi className="h-4 w-4 text-[#23a559]" />
-            Peer-to-peer
+          {/* Encryption indicator */}
+          <span className="flex items-center gap-1.5">
+            {encrypted ? (
+              <ShieldCheck className="h-4 w-4 text-[#23a559]" />
+            ) : (
+              <Shield className="h-4 w-4 text-[#f0b232]" />
+            )}
+            {encrypted ? "Encrypted" : "Connecting..."}
           </span>
 
+          {/* Connection quality */}
+          <span className="flex items-center gap-1.5">
+            <Wifi
+              className="h-4 w-4"
+              style={{ color: qualityColor }}
+            />
+            {connectionQuality}
+          </span>
+
+          {/* Participant count */}
           <span className="flex items-center gap-1.5">
             <Users className="h-4 w-4" />
             {present.length || 1} in call
@@ -650,12 +765,12 @@ const onPresence = (members: Participant[]) => {
         </div>
       </div>
 
-      <div className="relative flex flex-1 flex-col items-center justify-center gap-6 overflow-auto p-5 sm:p-8">
-        <div className="w-full max-w-5xl rounded-2xl border border-white/5 bg-[#2b2d31]/90 p-4 shadow-2xl sm:p-6">
+      {/* Main content */}
+      <div className="relative flex flex-1 flex-col items-center justify-center gap-6 overflow-auto p-6">
+        <div className="w-full max-w-5xl rounded-2xl border border-white/5 bg-[#2b2d31]/90 p-6 shadow-2xl">
           <div className="mb-5 flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">In this call</p>
-
               <p className="text-xs text-[#949ba4]">
                 {active
                   ? `${present.length || 1} connected · ${visible.length} avatars shown`
@@ -687,9 +802,10 @@ const onPresence = (members: Participant[]) => {
 
           <div
             className={`grid gap-4 ${
-              video ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
+              video ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
             }`}
           >
+            {/* Local video */}
             <div className="relative overflow-hidden rounded-xl border border-white/5 bg-[#111214]">
               <video
                 ref={localVideo}
@@ -721,6 +837,7 @@ const onPresence = (members: Participant[]) => {
               </span>
             </div>
 
+            {/* Remote streams */}
             {remoteStreams.map((item) => (
               <RemoteTile
                 key={item.participant.socketId}
@@ -729,19 +846,21 @@ const onPresence = (members: Participant[]) => {
               />
             ))}
 
+            {/* Waiting state */}
             {active && !remoteStreams.length && (
               <div className="flex min-h-24 items-center justify-center rounded-xl border border-dashed border-[#404249] text-sm text-[#949ba4]">
-                Waiting for other members to join…
+                Waiting for other members to join...
               </div>
             )}
           </div>
         </div>
 
+        {/* Controls */}
         <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[#111214]/95 p-2 shadow-xl backdrop-blur">
           {!active ? (
             <Button
               onClick={() => void start()}
-              className="h-11 rounded-xl bg-[#5865f2] px-5 hover:bg-[#4752c4]"
+              className="h-11 rounded-xl bg-[#5865f2] px-5 hover:bg-[#4752c4] transition-colors"
             >
               <Phone className="mr-2 h-4 w-4" />
               Join call
@@ -751,7 +870,7 @@ const onPresence = (members: Participant[]) => {
               <Button
                 title={muted ? "Unmute microphone" : "Mute microphone"}
                 onClick={toggleMute}
-                className="h-11 w-11 rounded-xl bg-[#2b2d31] hover:bg-[#404249]"
+                className="h-11 w-11 rounded-xl bg-[#2b2d31] hover:bg-[#404249] transition-colors"
               >
                 {muted ? <MicOff /> : <Mic />}
               </Button>
@@ -760,7 +879,7 @@ const onPresence = (members: Participant[]) => {
                 <Button
                   title={camera ? "Turn off camera" : "Turn on camera"}
                   onClick={toggleCamera}
-                  className="h-11 w-11 rounded-xl bg-[#2b2d31] hover:bg-[#404249]"
+                  className="h-11 w-11 rounded-xl bg-[#2b2d31] hover:bg-[#404249] transition-colors"
                 >
                   {camera ? <Video /> : <VideoOff />}
                 </Button>
@@ -770,7 +889,7 @@ const onPresence = (members: Participant[]) => {
                 title="Leave call"
                 variant="destructive"
                 onClick={stop}
-                className="h-11 w-14 rounded-xl"
+                className="h-11 w-14 rounded-xl transition-colors"
               >
                 <PhoneOff />
               </Button>

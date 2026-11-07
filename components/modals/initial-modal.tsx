@@ -62,13 +62,13 @@ console.log("Error creating server:", err);
 
   return (
     <Dialog open >
-      <DialogContent className="bg-zinc-900 text-white p-0 overflow-hidden">
+      <DialogContent className="bg-[#2b2d31] text-white p-0 overflow-hidden rounded-xl border border-white/5">
         <DialogHeader className="pt-8 px-6">
           <DialogTitle className="text-2xl text-center font-bold">
             Customize your server
           </DialogTitle>
 
-          <DialogDescription className="text-center text-zinc-400">
+          <DialogDescription className="text-center text-[#949ba4]">
             Give your server a name and image. You can change it later.
           </DialogDescription>
         </DialogHeader>
@@ -96,14 +96,13 @@ console.log("Error creating server:", err);
               )}
             />
 
-            
             {/* SERVER NAME */}
             <Controller
               name="name"
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel className="uppercase text-xs font-bold text-zinc-400">
+                  <FieldLabel className="uppercase text-xs font-bold text-[#949ba4]">
                     Server name
                   </FieldLabel>
 
@@ -114,7 +113,7 @@ console.log("Error creating server:", err);
                     aria-invalid={fieldState.invalid}
                     autoComplete="off"
                     disabled={isLoading}
-                    className="bg-zinc-800/50 border-0 focus-visible:ring-0 text-white focus-visible:ring-offset-0 placeholder:text-zinc-500 caret-white"
+                    className="rounded-xl bg-[#383a40] border-0 focus-visible:ring-1 focus-visible:ring-[#5865f2] text-white placeholder:text-[#949ba4]"
                   />
 
                   {fieldState.invalid && (
@@ -126,11 +125,12 @@ console.log("Error creating server:", err);
 
           </FieldGroup>
 
-          <DialogFooter className="bg-zinc-800 px-6 py-4 rounded-lg mt-6">
+          <DialogFooter className="bg-[#232428] px-6 py-4 rounded-xl mt-6">
             <Button
               type="submit"
               variant="primary"
               disabled={isLoading}
+              className="rounded-xl"
             >
               Create
             </Button>

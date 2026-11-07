@@ -13,7 +13,7 @@ export const NavigationAction = () => {
         type="button"
         aria-label="Add a server"
         onClick={() => onOpen("createServer")}
-        className="group mx-3 flex h-12 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-[#313338] transition-all hover:rounded-xl hover:bg-[#5865f2]"
+        className="group mx-3 flex h-12 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-[#313338] transition-all hover:bg-[#5865f2]"
       >
         <Plus className="text-[#b5bac1] transition group-hover:text-white" size={25} />
       </button>
