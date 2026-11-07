@@ -1,11 +1,12 @@
-"use client";
+﻿"use client";
 
 import { Paperclip, Send, Smile, X } from "lucide-react";
-import { FormEvent, useState, useCallback, useEffect } from "react";
+import { FormEvent, useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FileUpload } from "@/components/ui/file-upload";
 import { useE2EEContext } from "@/components/providers/e2ee-provider";
+import { E2EEIndicator } from "./e2ee-indicator";
 
 export const ChatInput = ({ channelId, onSent }: { channelId: string; onSent: () => void }) => {
   const [content, setContent] = useState("");
@@ -15,19 +16,21 @@ export const ChatInput = ({ channelId, onSent }: { channelId: string; onSent: ()
   const [sending, setSending] = useState(false);
   
   const { encryptForChannel, initialized } = useE2EEContext();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const emojis = ["😀", "😂", "😍", "🔥", "👍", "🎉", "❤️", "🚀", "😅", "🤔", "😭", "🙏", "✅", "❌", "👀", "💯"];
 
   const handleSend = useCallback(async () => {
     if (!content.trim() && !fileUrl) return;
     setSending(true);
 
     try {
-      // Encrypt message content if E2EE is initialized
       let finalContent = content;
       
       if (initialized && content.trim()) {
         const encrypted = await encryptForChannel(channelId, content.trim());
         if (encrypted && encrypted.startsWith("{")) {
-          finalContent = encrypted; // Send encrypted content
+          finalContent = encrypted;
         }
       }
 
@@ -60,11 +63,14 @@ export const ChatInput = ({ channelId, onSent }: { channelId: string; onSent: ()
     await handleSend();
   };
 
-  const emojis = ["😀", "😂", "😍", "🔥", "👍", "🎉", "❤️", "🚀", "😅", "🤔", "😭", "🙏", "✅", "❌", "👀", "💯"];
+  const insertEmoji = (emoji: string) => {
+    setContent((value) => ${value});
+    setShowEmoji(false);
+    inputRef.current?.focus();
+  };
 
   return (
     <div className="shrink-0 border-t border-white/5 bg-[#1e1f22] px-4 pb-5 pt-3">
-      {/* File upload area */}
       {showUpload && (
         <div className="mx-auto mb-3 flex w-full max-w-5xl items-start gap-2">
           <div className="w-full max-w-sm">
@@ -87,7 +93,6 @@ export const ChatInput = ({ channelId, onSent }: { channelId: string; onSent: ()
       )}
       
       <form onSubmit={submit} className="mx-auto flex w-full max-w-5xl items-center gap-2">
-        {/* Attach button */}
         <Button 
           type="button" 
           size="icon" 
@@ -99,49 +104,49 @@ export const ChatInput = ({ channelId, onSent }: { channelId: string; onSent: ()
           <Paperclip />
         </Button>
         
-        {/* Message input */}
         <div className="relative flex-1">
           <Input 
+            ref={inputRef}
             value={content} 
             onChange={(event) => setContent(event.target.value)} 
             placeholder={initialized ? "Message this channel (encrypted)" : "Message this channel"} 
             disabled={sending} 
-            className="h-11 rounded-xl border-0 bg-[#383a40] pr-12 text-[#dbdee1] shadow-none placeholder:text-[#949ba4] focus-visible:ring-1 focus-visible:ring-[#5865f2] transition-colors" 
+            className="h-11 rounded-xl border-0 bg-[#383a40] pr-36 text-[#dbdee1] shadow-none placeholder:text-[#949ba4] focus-visible:ring-1 focus-visible:ring-[#5865f2] transition-colors" 
           />
           
-          {/* Emoji button */}
-          <Button 
-            type="button" 
-            size="icon-xs" 
-            variant="ghost" 
-            title="Add emoji" 
-            className="absolute right-1 top-1/2 -translate-y-1/2 text-[#b5bac1] hover:bg-[#35373c] hover:text-white transition-colors" 
-            onClick={() => setShowEmoji((value) => !value)}
-          >
-            <Smile />
-          </Button>
-          
-          {/* Emoji picker */}
-          {showEmoji && (
-            <div className="absolute bottom-full right-0 z-50 mb-2 grid w-64 grid-cols-8 gap-1 rounded-xl border border-[#1f2023] bg-[#111214] p-2 shadow-2xl">
-              {emojis.map((emoji) => (
-                <button
-                  type="button"
-                  key={emoji}
-                  className="rounded-lg p-2 text-lg transition-all hover:scale-125 hover:bg-[#35373c] hover:shadow-sm"
-                  onClick={() => {
-                    setContent((value) => `${value}${emoji}`);
-                    setShowEmoji(false);
-                  }}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            <E2EEIndicator initialized={initialized} />
+            
+            <Button 
+              type="button" 
+              size="icon-xs" 
+              variant="ghost" 
+              title="Add emoji" 
+              className="text-[#b5bac1] hover:bg-[#35373c] hover:text-white transition-colors" 
+              onClick={() => setShowEmoji((value) => !value)}
+            >
+              <Smile />
+            </Button>
+            
+            {showEmoji && (
+              <div className="absolute bottom-full right-0 z-50 mb-2 w-64 rounded-xl border border-[#1f2023] bg-[#111214] p-2 shadow-2xl">
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {emojis.map((emoji) => (
+                    <button
+                      type="button"
+                      key={emoji}
+                      className="rounded-lg p-1.5 text-lg transition-all hover:scale-125 hover:bg-[#35373c]"
+                      onClick={() => insertEmoji(emoji)}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         
-        {/* Send button */}
         <Button 
           type="submit" 
           size="icon" 

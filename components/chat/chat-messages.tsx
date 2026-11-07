@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { Pencil, Pin, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { ChatInput } from "./chat-input";
 import { useSocket } from "@/components/providers/socket-provider";
 import { useE2EEContext } from "@/components/providers/e2ee-provider";
+import { ChatMessagesSkeleton } from "./chat-messages-skeleton";
+import { ChatEmptyState } from "./chat-empty-state";
+import { RelativeTimestamp } from "@/components/ui/relative-timestamp";
 
 type ChatMessage = {
   id: string;
@@ -28,7 +31,8 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ChatMessage[]>([]);
   const [showPinned, setShowPinned] = useState(false);
-  const [decryptedCache, setDecryptedCache] = useState<Map<string, string>>(new Map());
+  const [decryptedCache] = useState<Map<string, string>>(new Map());
+  const [loading, setLoading] = useState(true);
   
   const { socket, isConnected } = useSocket();
   const { decryptFromChannel, initialized } = useE2EEContext();
@@ -37,26 +41,22 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
     const query = new URLSearchParams({ channelId, limit: "10" });
     if (before) query.set("before", before);
     try {
-      const response = await fetch(`/api/messages?${query}`, { cache: "no-store" });
+      const response = await fetch(/api/messages?, { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json() as { messages: ChatMessage[]; hasMore: boolean };
       setHasMore(data.hasMore);
       setMessages((current) => before ? [...data.messages, ...current] : data.messages);
+      setLoading(false);
     } catch {
-      // Navigation, tab suspension, or a temporary network interruption can abort fetch.
+      setLoading(false);
     }
   }, [channelId]);
 
-  /**
-   * Decrypt a message if it's encrypted
-   */
   const getDecryptedContent = useCallback(async (message: ChatMessage): Promise<string> => {
-    // Return from cache if available
     if (decryptedCache.has(message.id)) {
       return decryptedCache.get(message.id)!;
     }
 
-    // If not encrypted or E2EE not ready, return as-is
     if (!message.encrypted || !initialized) {
       return message.content;
     }
@@ -64,10 +64,7 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
     try {
       const decrypted = await decryptFromChannel(channelId, message.content);
       const finalContent = decrypted ?? message.content;
-      
-      // Cache the result
-      setDecryptedCache((prev) => new Map(prev).set(message.id, finalContent));
-      
+      decryptedCache.set(message.id, finalContent);
       return finalContent;
     } catch (error) {
       console.error("[ChatMessages] Decryption error:", error);
@@ -75,34 +72,21 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
     }
   }, [channelId, decryptFromChannel, initialized, decryptedCache]);
 
-  /**
-   * Decrypt search results
-   */
-  const decryptSearchResults = useCallback(async (msgs: ChatMessage[]): Promise<ChatMessage[]> => {
-    if (!initialized) return msgs;
+  useEffect(() => {
+    const init = setTimeout(() => void load(), 0);
+    const interval = !socket || !isConnected ? window.setInterval(() => void load(), 3000) : null;
     
-    return Promise.all(
-      msgs.map(async (msg) => {
-        if (msg.encrypted) {
-          const decrypted = await getDecryptedContent(msg);
-          return { ...msg, content: decrypted };
-        }
-        return msg;
-      })
-    );
-  }, [initialized, getDecryptedContent]);
+    return () => {
+      clearTimeout(init);
+      if (interval) clearInterval(interval);
+    };
+  }, [channelId, isConnected, load, socket]);
 
   useEffect(() => {
-    const initial = window.setTimeout(() => void load(), 0);
-    
-    if (!socket || !isConnected) {
-      const timer = window.setInterval(() => void load(), 3000);
-      return () => { window.clearTimeout(initial); window.clearInterval(timer); };
-    }
+    if (!socket || !isConnected) return;
 
     const receive = async (event: { type: "created" | "updated" | "deleted"; message: ChatMessage }) => {
       if (event.type === "created") {
-        // Update messages list
         setMessages((current) => {
           const found = current.some((message) => message.id === event.message.id);
           if (found) return current;
@@ -119,8 +103,11 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
 
     socket.emit("join-channel", channelId);
     socket.on("message-event", receive);
-    return () => { window.clearTimeout(initial); socket.emit("leave-channel", channelId); socket.off("message-event", receive); };
-  }, [channelId, isConnected, load, socket]);
+    return () => {
+      socket.emit("leave-channel", channelId);
+      socket.off("message-event", receive);
+    };
+  }, [channelId, isConnected, socket]);
 
   useEffect(() => {
     const receiveSearch = async (event: Event) => {
@@ -132,10 +119,19 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
       }
       
       try {
-        const response = await fetch(`/api/messages?channelId=${encodeURIComponent(channelId)}&q=${encodeURIComponent(query)}&limit=50`, { cache: "no-store" });
+        const response = await fetch(/api/messages?channelId=&q=&limit=50, { cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json() as { messages: ChatMessage[] };
-        const decrypted = await decryptSearchResults(data.messages);
+        
+        // Decrypt results if needed
+        const decrypted = await Promise.all(
+          data.messages.map(async (msg) => {
+            if (msg.encrypted && initialized) {
+              msg.content = await getDecryptedContent(msg);
+            }
+            return msg;
+          })
+        );
         setSearchResults(decrypted);
       } catch {
         setSearchResults([]);
@@ -145,18 +141,47 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
     const receivePinned = (event: Event) => setShowPinned((event as CustomEvent<{ show: boolean }>).detail.show);
     window.addEventListener("syncmove:channel-search", receiveSearch);
     window.addEventListener("syncmove:show-pinned", receivePinned);
-    return () => { window.removeEventListener("syncmove:channel-search", receiveSearch); window.removeEventListener("syncmove:show-pinned", receivePinned); };
-  }, [channelId, decryptSearchResults]);
+    return () => {
+      window.removeEventListener("syncmove:channel-search", receiveSearch);
+      window.removeEventListener("syncmove:show-pinned", receivePinned);
+    };
+  }, [channelId, initialized, getDecryptedContent]);
 
-  const remove = async (id: string) => { await fetch(`/api/messages/${id}`, { method: "DELETE" }); await load(); };
-  const save = async (id: string) => { await fetch(`/api/messages/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: editValue }) }); setEditing(null); await load(); };
-  const togglePin = async (message: ChatMessage) => { await fetch(`/api/messages/${message.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pinned: !message.pinned }) }); await load(); };
+  const remove = async (id: string) => { await fetch(/api/messages/, { method: "DELETE" }); await load(); };
+  const save = async (id: string) => { 
+    await fetch(/api/messages/, { 
+      method: "PATCH", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ content: editValue }) 
+    }); 
+    setEditing(null); 
+    await load(); 
+  };
+  const togglePin = async (message: ChatMessage) => { 
+    await fetch(/api/messages/, { 
+      method: "PATCH", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ pinned: !message.pinned }) 
+    }); 
+    await load(); 
+  };
 
   const displayedMessages = (searchQuery ? searchResults : messages).filter((message) => !showPinned || message.pinned);
 
+  if (loading) {
+    return (
+      <div className="flex h-0 min-h-0 flex-1 flex-col bg-transparent dark:bg-[#1e1f22]">
+        <div className="h-0 min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-6">
+          <ChatMessagesSkeleton />
+        </div>
+        <ChatInput channelId={channelId} onSent={() => void load()} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-0 min-h-0 flex-1 flex-col bg-transparent dark:bg-[#1e1f22]">
-      <div className="h-0 min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-6">
+      <div className="h-0 min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-6 scrollbar-thin">
         {hasMore && (
           <Button 
             variant="ghost" 
@@ -169,25 +194,15 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
         
         <div className="space-y-1">
           {displayedMessages.length === 0 && (
-            <div className="flex h-full min-h-64 flex-col items-center justify-center text-center">
-              <div className="mb-3 rounded-full bg-[#5865f2]/15 p-4 text-[#a5b4fc]">
-                <Pencil className="h-6 w-6" />
-              </div>
-              <h2 className="text-lg font-semibold text-white">
-                {searchQuery ? "No messages found" : showPinned ? "No pinned messages" : "Welcome to the channel"}
-              </h2>
-              <p className="mt-1 max-w-sm text-sm text-[#949ba4]">
-                {searchQuery 
-                  ? `Nothing matched "${searchQuery}".` 
-                  : showPinned 
-                    ? "Pin important messages to find them here." 
-                    : "This is the beginning of the conversation. Send a message to get things moving."}
-              </p>
-            </div>
+            <ChatEmptyState 
+              onSendMessage={() => {
+                const input = document.querySelector('input[placeholder*="Message this channel"]') as HTMLInputElement;
+                input?.focus();
+              }}
+            />
           )}
           
           {displayedMessages.map(async (message) => {
-            const own = message.member.profileId === profileId;
             const displayContent = await getDecryptedContent(message);
             
             return (
@@ -204,11 +219,9 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
                   className="mt-0.5 h-10 w-10 shrink-0 rounded-full"
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="font-semibold text-white">{message.member.profile.name}</span>
-                    <time className="text-[11px] text-[#949ba4]">
-                      {new Date(message.CreatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </time>
+                    <RelativeTimestamp date={message.CreatedAt} />
                     {message.encrypted && initialized && (
                       <span className="text-[10px] text-[#23a559]" title="End-to-end encrypted">🔒</span>
                     )}
@@ -243,14 +256,14 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
                   )}
                 </div>
                 
-                {!message.deleted && (own || true) && (
+                {!message.deleted && (
                   <div className="hidden gap-1 rounded-lg border border-[#111214] bg-[#2b2d31] p-1 shadow group-hover:flex">
                     <Button 
                       size="icon-xs" 
                       variant="ghost" 
                       title={message.pinned ? "Unpin message" : "Pin message"} 
                       onClick={() => void togglePin(message)}
-                      className="rounded hover:bg-[#35373c]"
+                      className="rounded hover:bg-[#35373c] transition-colors"
                     >
                       <Pin className={message.pinned ? "text-[#a5b4fc]" : ""} />
                     </Button>
@@ -259,7 +272,7 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
                       variant="ghost" 
                       title="Edit message" 
                       onClick={() => { setEditing(message.id); setEditValue(displayContent); }}
-                      className="rounded hover:bg-[#35373c]"
+                      className="rounded hover:bg-[#35373c] transition-colors"
                     >
                       <Pencil />
                     </Button>
@@ -268,7 +281,7 @@ export const ChatMessages = ({ channelId, profileId }: { channelId: string; prof
                       variant="ghost" 
                       title="Delete message" 
                       onClick={() => void remove(message.id)}
-                      className="rounded hover:bg-[#f23f42] hover:text-white"
+                      className="rounded hover:bg-[#f23f42] hover:text-white transition-colors"
                     >
                       <Trash2 />
                     </Button>
