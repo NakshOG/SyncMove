@@ -9,6 +9,7 @@
 - [x] lib/e2ee/session.ts - Session management
 - [x] lib/e2ee/file-encryption.ts - File encryption
 - [x] lib/e2ee/compression.ts - Compression utilities
+- [x] lib/e2ee/sender-key.ts - Group encryption (Sender Keys)
 
 ### E2EE Integration
 - [x] Prisma KeyBundle model
@@ -17,6 +18,13 @@
 - [x] E2EEProvider context
 - [x] Chat encryption/decryption
 - [x] Lock icon indicator
+
+### File Encryption
+- [x] Encrypt before UploadThing upload
+- [x] Compress-then-encrypt workflow
+- [x] EncryptedFileUpload component
+- [x] EncryptedFileDownload component
+- [x] API endpoint for encrypted files
 
 ### Bug Fixes & UI
 - [x] WebRTC ICE candidate race condition
@@ -32,25 +40,12 @@
 
 ## Remaining Tasks
 
-### 1. Group Encryption (Sender Keys) - IN PROGRESS
-- [ ] Implement Sender Key generation
-- [ ] Distribute sender keys to all members (encrypted per member)
-- [ ] Encrypt group messages with sender key
-- [ ] Re-encrypt on member join/leave
-- [ ] Store sender key chains in IndexedDB
-
-### 2. File Encryption
-- [ ] Encrypt files before UploadThing upload
-- [ ] Decrypt files on download
-- [ ] Compress-then-encrypt workflow
-- [ ] Handle encrypted file previews
-
-### 3. Socket Security
-- [ ] Socket-level authentication (validate Clerk on handshake)
+### 1. Socket Security - IN PROGRESS
+- [x] Socket-level authentication (validate Clerk on handshake)
 - [ ] Heartbeat/ping-pong mechanism
 - [ ] Rate limiting on socket events
 
-### 4. TURN Server Config
+### 2. TURN Server Config
 - [ ] Add TURN server credentials
 - [ ] Configure iceServers in WebRTC
 - [ ] Deploy/provision TURN server
@@ -63,48 +58,34 @@
 |----------|--------|
 | E2EE Core | ✅ Done |
 | E2EE Integration | ✅ Done |
-| Group Encryption | 🔄 In Progress |
-| File Encryption | ⏳ Pending |
-| Socket Auth | ⏳ Pending |
+| Group Encryption | ✅ Done |
+| File Encryption | ✅ Done |
+| Socket Security | 🔄 In Progress |
 | TURN Config | ⏳ Pending |
 
 ---
 
-## Group Encryption Approach (Sender Keys)
+## Socket Security Implementation
 
-For efficient group messaging, we use **Sender Keys** instead of encrypting each message for every member.
-
+### Authentication Flow
 ```
-Current Problem:
-- 10 members = 10 encryptions per message = O(n) complexity
-
-With Sender Keys:
-- Each member generates ONE sender key for the group
-- Encrypt once per message = O(1) complexity
-- Members store sender keys from all other members
-- When member joins/leaves, only that member needs new key
+1. Client connects to Socket.IO
+2. Client sends auth token in handshake
+3. Server validates with Clerk
+4. If valid → allow connection, store user data
+5. If invalid → disconnect
 ```
 
-### Sender Key Distribution
+### Heartbeat Mechanism
 ```
-1. Alice generates Sender Key (SK_A)
-2. For each member M in group:
-   - Derive shared secret using X3DH with M's session
-   - Encrypt SK_A with shared secret
-   - Store encrypted SK_A for M
-3. When Alice sends:
-   - Encrypt message with SK_A (one operation)
-4. Each member decrypts with their copy of SK_A
+Client ─── ping (every 30s) ───► Server
+Client ◄── pong (immediate) ──── Server
+
+If no pong within 10s → disconnect
+If no ping within 60s → disconnect
 ```
 
-### Message Format
-```typescript
-{
-  v: 2,                    // Version
-  type: "sender-key",
-  senderId: "alice",
-  senderKeyId: "key-123",  // Which sender key to use
-  ciphertext: "base64...", // Message encrypted with sender key
-  iv: "base64..."         // IV for AES-GCM
-}
-```
+### Rate Limiting
+- Max 100 messages/second per socket
+- Max 50 events/second per socket
+- Flood detection → temp ban
