@@ -77,18 +77,38 @@ async function generateTLSCertificate(): Promise<RTCCertificate> {
 
 /**
  * Get ICE server configuration with STUN and TURN
+ * Uses OpenRelay's free public TURN server by default
+ * Configure custom TURN via environment variables for production
  */
 function getICEServers(): RTCIceServer[] {
-  return [
+  const servers: RTCIceServer[] = [
+    // Google's public STUN servers
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
-    // Add your TURN server here for NAT traversal:
-    // {
-    //   urls: "turn:your-turn-server.com:3478",
-    //   username: process.env.TURN_USERNAME,
-    //   credential: process.env.TURN_PASSWORD,
-    // },
   ];
+
+  // Add TURN server if configured (OpenRelay free or custom)
+  const turnUrl = process.env.NEXT_PUBLIC_TURN_SERVER_URL;
+  const turnUsername = process.env.NEXT_PUBLIC_TURN_USERNAME;
+  const turnCredential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL;
+
+  if (turnUrl) {
+    if (turnUsername && turnCredential) {
+      // Custom TURN server with authentication
+      servers.push({
+        urls: turnUrl,
+        username: turnUsername,
+        credential: turnCredential,
+      });
+    } else {
+      // OpenRelay or other anonymous TURN server
+      servers.push({
+        urls: turnUrl,
+      });
+    }
+  }
+
+  return servers;
 }
 
 const RemoteTile = ({
@@ -183,6 +203,12 @@ export const CallRoom = ({
   const [remoteStreams, setRemoteStreams] = useState<
     { participant: Participant; stream: MediaStream }[]
   >([]);
+
+  // Derived state - exclude self from remote participants
+  const remoteParticipants = present.filter(
+    (p) => !p.socketId.startsWith("local:"),
+  );
+  const remoteCount = Math.max(0, remoteParticipants.length);
 
   const localVideo = useRef<HTMLVideoElement>(null);
 
@@ -760,7 +786,9 @@ export const CallRoom = ({
           {/* Participant count */}
           <span className="flex items-center gap-1.5">
             <Users className="h-4 w-4" />
-            {present.length || 1} in call
+            {active
+              ? `${remoteCount} participant${remoteCount !== 1 ? "s" : ""}`
+              : "Not in call"}
           </span>
         </div>
       </div>
@@ -773,31 +801,41 @@ export const CallRoom = ({
               <p className="text-sm font-medium">In this call</p>
               <p className="text-xs text-[#949ba4]">
                 {active
-                  ? `${present.length || 1} connected · ${visible.length} avatars shown`
-                  : `${stageMembers.length} in this call`}
+                  ? `${remoteCount} participant${remoteCount !== 1 ? "s" : ""} connected`
+                  : "Waiting for others to join"}
               </p>
             </div>
 
-            <div className="flex -space-x-2">
-              {stageMembers
-                .slice(0, MAX_VISIBLE_AVATARS)
-                .map((member) => (
-                  <div
-                    key={member.socketId}
-                    className="relative overflow-hidden rounded-full border-2 border-[#2b2d31] bg-[#111214] ring-2 ring-[#2b2d31]"
-                  >
-                    <Image
-                      src={member.imageUrl}
-                      alt={member.name}
-                      title={member.name}
-                      width={36}
-                      height={36}
-                      unoptimized
-                      className="h-9 w-9 rounded-full object-cover"
-                    />
+            {/* Remote participants avatars only */}
+            {remoteParticipants.length > 0 && (
+              <div className="flex -space-x-2">
+                {remoteParticipants
+                  .slice(0, MAX_VISIBLE_AVATARS)
+                  .map((member) => (
+                    <div
+                      key={member.socketId}
+                      className="relative overflow-hidden rounded-full border-2 border-[#2b2d31] bg-[#111214] ring-2 ring-[#2b2d31]"
+                    >
+                      <Image
+                        src={member.imageUrl}
+                        alt={member.name}
+                        title={member.name}
+                        width={36}
+                        height={36}
+                        unoptimized
+                        className="h-9 w-9 rounded-full object-cover"
+                      />
+                      {/* Online indicator */}
+                      <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
+                    </div>
+                  ))}
+                {remoteParticipants.length > MAX_VISIBLE_AVATARS && (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#2b2d31] bg-[#2b2d31] text-xs font-medium text-[#b5bac1]">
+                    +{remoteParticipants.length - MAX_VISIBLE_AVATARS}
                   </div>
-                ))}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div
@@ -846,10 +884,29 @@ export const CallRoom = ({
               />
             ))}
 
-            {/* Waiting state */}
-            {active && !remoteStreams.length && (
-              <div className="flex min-h-24 items-center justify-center rounded-xl border border-dashed border-[#404249] text-sm text-[#949ba4]">
-                Waiting for other members to join...
+            {/* Waiting / Empty state */}
+            {active && remoteStreams.length === 0 && (
+              <div className="flex min-h-32 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#404249]">
+                <p className="text-sm text-[#949ba4]">Waiting for others to join...</p>
+                {remoteParticipants.length > 0 && (
+                  <div className="flex -space-x-3">
+                    {remoteParticipants.map((member) => (
+                      <div
+                        key={member.socketId}
+                        className="relative overflow-hidden rounded-full border-2 border-[#2b2d31] ring-2 ring-[#2b2d31]"
+                      >
+                        <Image
+                          src={member.imageUrl}
+                          alt={member.name}
+                          width={40}
+                          height={40}
+                          unoptimized
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

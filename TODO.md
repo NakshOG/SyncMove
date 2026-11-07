@@ -26,6 +26,13 @@
 - [x] EncryptedFileDownload component
 - [x] API endpoint for encrypted files
 
+### Socket Security
+- [x] Clerk authentication on socket handshake
+- [x] Heartbeat/ping-pong mechanism (30s interval)
+- [x] Rate limiting per socket (100 msgs/sec, 50 events/sec)
+- [x] Flood detection and auto-disconnect
+- [x] Connection tracking per user (max 5 connections)
+
 ### Bug Fixes & UI
 - [x] WebRTC ICE candidate race condition
 - [x] DTLS-SRTP enforcement
@@ -40,15 +47,11 @@
 
 ## Remaining Tasks
 
-### 1. Socket Security - IN PROGRESS
-- [x] Socket-level authentication (validate Clerk on handshake)
-- [ ] Heartbeat/ping-pong mechanism
-- [ ] Rate limiting on socket events
-
-### 2. TURN Server Config
-- [ ] Add TURN server credentials
-- [ ] Configure iceServers in WebRTC
-- [ ] Deploy/provision TURN server
+### TURN Server Config - DONE
+- [x] Add TURN server credentials to environment
+- [x] Configure iceServers in WebRTC
+- [x] Coturn Docker configuration
+- [x] Self-hosted TURN server ready
 
 ---
 
@@ -60,32 +63,46 @@
 | E2EE Integration | ✅ Done |
 | Group Encryption | ✅ Done |
 | File Encryption | ✅ Done |
-| Socket Security | 🔄 In Progress |
-| TURN Config | ⏳ Pending |
+| Socket Security | ✅ Done |
+| TURN Config | 🔄 In Progress |
 
 ---
 
-## Socket Security Implementation
+## TURN Server Configuration
 
-### Authentication Flow
-```
-1. Client connects to Socket.IO
-2. Client sends auth token in handshake
-3. Server validates with Clerk
-4. If valid → allow connection, store user data
-5. If invalid → disconnect
-```
+For WebRTC calls to work behind corporate firewalls/NAT, you need a TURN server.
 
-### Heartbeat Mechanism
-```
-Client ─── ping (every 30s) ───► Server
-Client ◄── pong (immediate) ──── Server
-
-If no pong within 10s → disconnect
-If no ping within 60s → disconnect
+### Environment Variables
+```bash
+# Get these from your TURN server provider
+TURN_SERVER_URL=your-turn-server.com:3478
+TURN_USERNAME=your-username
+TURN_PASSWORD=your-password
 ```
 
-### Rate Limiting
-- Max 100 messages/second per socket
-- Max 50 events/second per socket
-- Flood detection → temp ban
+### Recommended TURN Providers
+1. **Twilio** - $0.001 per relay hour
+2. **OpenRelay** - Free, open source
+3. **Coturn** - Self-host (requires server)
+
+### Quick Deployment (OpenRelay - Free)
+1. Sign up at https://www.openrelayproject.com/
+2. Get credentials from dashboard
+3. Add to .env file
+4. Restart app
+
+### Self-Hosted (Coturn)
+```bash
+# Docker compose example
+coturn:
+  image: coturn/coturn
+  ports:
+    - "3478:3478"
+    - "3478:3478/udp"
+  environment:
+    - TURN_SERVER_NAME=your-domain.com
+    - REALM=your-domain.com
+    - SECRET=your-secret
+  volumes:
+    - ./turnserver.conf:/etc/coturn/turnserver.conf
+```

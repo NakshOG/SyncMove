@@ -867,6 +867,62 @@ npm run dev
 | `lib/e2ee/double-ratchet.ts` | Message encryption |
 | `prisma/schema.prisma` | Database schema |
 | `components/chat/call-room.tsx` | WebRTC video calls |
+| `docker-compose.yml` | Application container deployment |
+
+---
+
+## Docker Deployment
+
+SyncMove supports full Docker deployment with all services.
+
+### Quick Start
+
+```bash
+# Clone and configure
+cp .env.example .env
+# Edit .env with your credentials
+
+# Start all services
+docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
+```
+
+### Services Included
+
+| Service | Image | Port | Purpose |
+|---------|-------|------|---------|
+| app | Next.js custom | 3000 | Web application |
+| db | MariaDB 10.11 | 3306 | Database |
+| coturn | coturn/coturn | 3478 | TURN server (optional) |
+
+### Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Docker Network                            │
+│  ┌──────────┐     ┌──────────┐     ┌──────────┐            │
+│  │   App    │────▶│   DB     │     │  Coturn  │            │
+│  │ :3000    │     │ :3306    │     │ :3478    │            │
+│  └──────────┘     └──────────┘     └──────────┘            │
+└─────────────────────────────────────────────────────────────┘
+         │                                         │
+         ▼                                         ▼
+    localhost:3000                         UDP/TCP :3478
+```
+
+### Environment Variables
+
+Required in `.env`:
+- `DATABASE_URL` - MySQL connection string
+- `CLERK_*` - Clerk authentication
+- `UPLOADTHING_*` - File storage credentials
+- `NEXT_PUBLIC_TURN_*` - TURN server (optional for local dev)
+
+### Production Considerations
+
+1. **Use secrets management** for production credentials
+2. **Enable TLS** with Traefik or nginx proxy
+3. **Scale horizontally** - app container is stateless
+4. **Configure CORS** for production domains
 
 ---
 
@@ -874,12 +930,12 @@ npm run dev
 
 | Priority | Feature | Description |
 |----------|---------|-------------|
-| High | Group Encryption | Sender Keys for efficient group messaging |
-| High | File Encryption | Encrypt files before UploadThing |
-| Medium | TURN Server | Deploy production TURN for NAT traversal |
+| High | Thread Support | Nested message threads |
+| High | Reactions | Emoji reactions to messages |
 | Medium | Push Notifications | Web Push API for offline messages |
-| Low | Thread Support | Nested message threads |
-| Low | Reactions | Emoji reactions to messages |
+| Medium | Message Search | Full-text encrypted search |
+| Low | Voice Messages | Audio message recording |
+| Low | Screen Sharing | Share screen in video calls |
 
 ---
 
