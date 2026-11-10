@@ -52,11 +52,21 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              BACKEND SERVICES                                 │
 │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐  ┌────────────┐ │
-│  │   Next.js      │  │   MariaDB      │  │  UploadThing   │  │   TURN     │ │
-│  │   API Server   │◄─┤   (Prisma)     │◄─┤  File Storage  │◄─┤   Server   │ │
-│  └────────────────┘  └────────────────┘  └────────────────┘  └────────────┘ │
+│  │   Next.js      │  │   MariaDB      │  │   Redis        │  │   TURN     │ │
+│  │   API Server   │◄─┤   (Prisma)     │◄─┤  Pub/Sub +     │◄─┤   Server   │ │
+│  │ + Socket.IO    │  │   + SQL Data   │  │  Presence      │  │   Relay    │ │
+│  └───────┬────────┘  └────────────────┘  └───────┬────────┘  └────────────┘ │
+│          │                                         │                             │
+│          └──────────────────────┬──────────────────┘                             │
+│                                 ▼                                              │
+│                        ┌────────────────┐                                        │
+│                        │ UploadThing    │                                        │
+│                        │ File Storage    │                                        │
+│                        └────────────────┘                                        │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+`Redis` is the shared realtime coordination layer for multi-instance deployments: it enables Socket.IO adapter fanout, cross-node presence sync, and pub/sub delivery for chat, server, and call events.
 
 ---
 
@@ -726,25 +736,34 @@ model KeyBundle {
                     │                        │                        │
                     ▼                        ▼                        ▼
            ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-           │   Next.js App   │     │   MariaDB       │     │    TURN Server  │
-           │   (Vercel)      │     │   (Planetscale/ │     │   (Coturn/      │
-           │   - API Routes  │     │    Railway)     │     │    OpenRelay)   │
-           │   - SSR         │     │   - Prisma      │     │   - NAT         │
-           │   - Static      │     │   - Messages    │     │     Traversal   │
-           └────────┬────────┘     │   - Key Bundles │     │   - Relay       │
-                    │              └────────┬────────┘     └─────────────────┘
-                    │                       │
-                    │                       │
-          ┌─────────┴─────────┐              │
-          │                   │              │
-          ▼                   ▼              ▼
-   ┌─────────────┐    ┌─────────────┐  ┌─────────────┐
-   │  UploadThing │    │   Socket.IO │  │   Redis     │
-   │  (S3-based)  │    │   Server    │  │  (Optional) │
-   │  - Files     │    │   (Same as  │  │  - Sessions │
-   │  - Images    │    │    Next.js) │  │  - Cache    │
-   └─────────────┘    └─────────────┘  └─────────────┘
+           │   Next.js App   │     │   MariaDB       │     │   Redis         │
+           │   (Vercel)      │     │   (Prisma/      │     │   Pub/Sub +     │
+           │   - API Routes  │     │   MySQL/MariaDB)│     │   Presence      │
+           │   - Socket.IO   │     │   - Messages    │     │   - Rooms       │
+           │   - SSR         │     │   - Key Bundles │     │   - Fanout      │
+           └────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+                    │                       │                        │
+                    │                       │                        │
+                    └──────────────┬────────┴───────────────┬──────────────┘
+                                   ▼                               ▼
+                         ┌─────────────────┐           ┌─────────────────┐
+                         │   Socket.IO     │           │   TURN Server   │
+                         │   Adapter/Rooms │           │   (Coturn/      │
+                         │   Shared State  │           │    OpenRelay)   │
+                         └─────────────────┘           │   - NAT         │
+                                                       │   Traversal     │
+                                                       │   - Relay       │
+                                                       └─────────────────┘
+
+                         ┌─────────────────┐
+                         │  UploadThing    │
+                         │  (S3-based)     │
+                         │  - Files        │
+                         │  - Images       │
+                         └─────────────────┘
 ```
+
+Redis is the coordination layer that lets multiple app nodes share room state, presence, and realtime events without losing synchronization.
 
 ### Scaling Considerations
 
