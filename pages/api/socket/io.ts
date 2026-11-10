@@ -11,9 +11,15 @@
 import type { NextApiRequest } from "next";
 import { Server as SocketIOServer } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
-import { createClient } from "redis";
 import type { NextApiResponseServerIo } from "@/types/socket";
 import { verifyToken } from "@clerk/nextjs/server";
+import {
+  getRedisPubClient,
+  getRedisSubClient,
+  getServerPresence,
+  isRedisEnabled,
+  setServerPresence as setRedisServerPresence,
+} from "@/lib/redis";
 import { realtime } from "@/lib/realtime";
 
 export const config = { api: { bodyParser: false } };
@@ -213,17 +219,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
 
     const redisUrl = process.env.REDIS_URL;
     if (redisUrl) {
-      const pubClient = createClient({ url: redisUrl });
-      const subClient = createClient({ url: redisUrl });
+      const pubClient = await getRedisPubClient();
+      const subClient = await getRedisSubClient();
 
-      Promise.all([pubClient.connect(), subClient.connect()])
-        .then(() => {
-          io.adapter(createAdapter(pubClient, subClient));
-          console.log("[socket] Redis adapter enabled");
-        })
-        .catch((error) => {
-          console.error("[socket] Redis adapter failed to connect:", error);
-        });
+      if (pubClient && subClient) {
+        io.adapter(createAdapter(pubClient, subClient));
+        console.log("[socket] Redis adapter enabled");
+      } else {
+        console.warn("[socket] REDIS_URL is set but Redis client could not be created; continuing with local adapter");
+      }
     }
 
     // Event handlers for real-time updates
@@ -326,8 +330,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
         const profileId = socket.data.serverProfileId as string | undefined;
 
         if (serverId && profileId) {
-          setServerPresence(serverId, profileId, true, socket.id, now);
-          emitServerPresence(io, serverId);
+          void updateServerPresence(serverId, profileId, true, socket.id, now);
+          void emitServerPresence(io, serverId);
         }
 
         socket.emit("pong", { timestamp: now });
@@ -433,29 +437,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
         if (socket.data.serverId && socket.data.serverId !== serverId) {
           const previousServerId = socket.data.serverId as string;
           void socket.leave(`server:${previousServerId}`);
-          setServerPresence(previousServerId, socket.data.serverProfileId as string | undefined, false);
-          emitServerPresence(io, previousServerId);
+          void updateServerPresence(previousServerId, socket.data.serverProfileId as string | undefined, false);
+          void emitServerPresence(io, previousServerId);
         }
         
         socket.data.serverId = serverId;
         socket.data.serverProfileId = profileId;
         if (profileId) {
-          setServerPresence(serverId, profileId, true, socket.id, Date.now());
+          void updateServerPresence(serverId, profileId, true, socket.id, Date.now());
         }
         void Promise.resolve(socket.join(`server:${serverId}`))
-          .then(() => emitServerPresence(io, serverId));
+          .then(() => void emitServerPresence(io, serverId));
       });
 
       socket.on("leave-server", (serverId: string) => {
         if (!isAuthenticated || !serverId) return;
         void Promise.resolve(socket.leave(`server:${serverId}`))
-          .then(() => emitServerPresence(io, serverId));
+          .then(() => void emitServerPresence(io, serverId));
         
         if (socket.data.serverId === serverId) {
-          setServerPresence(serverId, socket.data.serverProfileId as string | undefined, false, socket.id, Date.now());
+          void updateServerPresence(serverId, socket.data.serverProfileId as string | undefined, false, socket.id, Date.now());
           socket.data.serverId = undefined;
           socket.data.serverProfileId = undefined;
-          emitServerPresence(io, serverId);
+          void emitServerPresence(io, serverId);
         }
       });
 
@@ -493,8 +497,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
         // Update presence
         if (socket.data.serverId) {
           const serverId = socket.data.serverId as string;
-          setServerPresence(serverId, socket.data.serverProfileId as string | undefined, false, socket.id, Date.now());
-          emitServerPresence(io, serverId);
+          void updateServerPresence(serverId, socket.data.serverProfileId as string | undefined, false, socket.id, Date.now());
+          void emitServerPresence(io, serverId);
         }
       });
 
@@ -511,7 +515,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
 }
 
 // Helper functions
-function setServerPresence(
+async function updateServerPresence(
+  serverId: string,
+  profileId: string | undefined,
+  online: boolean,
+  socketId?: string,
+  timestamp = Date.now(),
+) {
+  if (isRedisEnabled()) {
+    await setRedisServerPresence(serverId, profileId, online, socketId, timestamp);
+    return;
+  }
+
+  setLocalServerPresence(serverId, profileId, online, socketId, timestamp);
+}
+
+function setLocalServerPresence(
   serverId: string,
   profileId: string | undefined,
   online: boolean,
@@ -537,8 +556,11 @@ function setServerPresence(
   serverPresence.set(serverId, presenceMap);
 }
 
-function emitServerPresence(io: SocketIOServer, serverId: string) {
-  const profileIds = [...(serverPresence.get(serverId)?.keys() ?? [])];
+async function emitServerPresence(io: SocketIOServer, serverId: string) {
+  const profileIds = isRedisEnabled()
+    ? await getServerPresence(serverId)
+    : [...(serverPresence.get(serverId)?.keys() ?? [])];
+
   io.to(`server:${serverId}`).emit("server-presence", profileIds);
 }
 
