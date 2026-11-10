@@ -25,6 +25,15 @@ export const ourFileRouter = {
   MessageFile: f(["image", "pdf"])
     .middleware(async () => await handleAuth())
     .onUploadComplete(() => {}),
+
+  encryptedFile: f({
+    blob: {
+      maxFileSize: "1GB",
+      maxFileCount: 1,
+    },
+  })
+    .middleware(async () => await handleAuth())
+    .onUploadComplete(() => {}),
 } satisfies FileRouter;
 
 export type OurFileRouter = typeof ourFileRouter;

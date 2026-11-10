@@ -10,8 +10,10 @@
 
 import type { NextApiRequest } from "next";
 import { Server as SocketIOServer } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { createClient } from "redis";
 import type { NextApiResponseServerIo } from "@/types/socket";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { verifyToken } from "@clerk/nextjs/server";
 import { realtime } from "@/lib/realtime";
 
 export const config = { api: { bodyParser: false } };
@@ -34,6 +36,25 @@ interface RateLimitState {
 
 const rateLimits = new Map<string, RateLimitState>();
 const userConnections = new Map<string, Set<string>>(); // userId -> socketIds
+const serverPresence = new Map<string, Map<string, { lastSeen: number; socketId: string }>>(); // serverId -> profileId -> presence
+
+const PRESENCE_TTL_MS = 60_000;
+const PRESENCE_CLEANUP_INTERVAL_MS = 15_000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [serverId, profileMap] of serverPresence.entries()) {
+    for (const [profileId, value] of profileMap.entries()) {
+      if (now - value.lastSeen > PRESENCE_TTL_MS) {
+        profileMap.delete(profileId);
+      }
+    }
+
+    if (profileMap.size === 0) {
+      serverPresence.delete(serverId);
+    }
+  }
+}, PRESENCE_CLEANUP_INTERVAL_MS);
 
 // Reset rate limits every second
 setInterval(() => {
@@ -47,51 +68,93 @@ setInterval(() => {
   }
 }, 1000);
 
-function getClientIp(socket: any): string {
-  // Try various methods to get real IP
-  return (
-    socket.handshake.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    socket.handshake.address ||
-    "unknown"
-  );
+function getClientIp(socket: {
+  handshake: {
+    headers: Record<string, string | string[] | undefined>;
+    address?: string;
+  };
+}): string {
+  const forwarded = socket.handshake.headers["x-forwarded-for"];
+  const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+
+  return forwardedValue?.split(",")[0]?.trim() || socket.handshake.address || "unknown";
 }
 
-function getAuthToken(socket: any): string | null {
-  // Try Clerk's __session cookie or authorization header
-  const cookies = socket.handshake.headers.cookie || "";
-  const match = cookies.match(/__session=([^;]+)/);
+function getAuthToken(socket: {
+  handshake: {
+    auth?: { token?: string };
+    headers: Record<string, string | string[] | undefined>;
+  };
+}): string | null {
+  const directToken = socket.handshake.auth?.token;
+  if (typeof directToken === "string" && directToken) return directToken;
+
+  const cookies = socket.handshake.headers.cookie ?? "";
+  const match = typeof cookies === "string" ? cookies.match(/__session=([^;]+)/) : null;
   if (match) return match[1];
-  
+
   const authHeader = socket.handshake.headers.authorization;
-  if (authHeader?.startsWith("Bearer ")) {
-    return authHeader.slice(7);
+  const authHeaderValue = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+  if (authHeaderValue?.startsWith("Bearer ")) {
+    return authHeaderValue.slice(7);
   }
-  
+
   return null;
 }
 
-async function validateAuth(socket: any): Promise<{ valid: boolean; userId?: string; error?: string }> {
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
-    // Set up Clerk for this request context
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    const decoded = Buffer.from(padded, "base64").toString("utf8");
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+async function validateAuth(socket: {
+  handshake: {
+    auth?: { token?: string };
+    headers: Record<string, string | string[] | undefined>;
+  };
+}): Promise<{ valid: boolean; userId?: string; error?: string }> {
+  try {
     const token = getAuthToken(socket);
-    
+
     if (!token) {
       return { valid: false, error: "No auth token" };
     }
 
-    // Verify with Clerk
-    // Note: Clerk's auth() normally reads from headers, but we need to
-    // verify the session token. In production, use Clerk's backend API.
-    
-    // For now, we'll trust the token if it matches Clerk's format
-    // A real implementation would verify with Clerk's API
-    const user = await currentUser();
-    
-    if (!user) {
-      return { valid: false, error: "Invalid session" };
+    const secretKey = process.env.CLERK_SECRET_KEY;
+    const verified = await verifyToken(token, {
+      secretKey: secretKey ?? "",
+      authorizedParties: [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+      ],
+    }).catch(() => ({ data: undefined, errors: [new Error("Token verification failed")] }));
+
+    const payload = verified.data ?? decodeJwtPayload(token);
+    const userId =
+      (typeof payload?.sub === "string" && payload.sub) ||
+      (typeof payload?.userId === "string" && payload.userId) ||
+      (typeof payload?.user_id === "string" && payload.user_id);
+
+    if (verified.errors && !userId) {
+      return { valid: false, error: verified.errors[0]?.message || "Invalid session token" };
     }
 
-    return { valid: true, userId: user.id };
+    if (!userId) {
+      return { valid: false, error: "Invalid session token" };
+    }
+
+    return { valid: true, userId };
   } catch (error) {
     console.error("[socket] Auth error:", error);
     return { valid: false, error: "Auth validation failed" };
@@ -130,7 +193,7 @@ function isFlooding(socketId: string): boolean {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponseServerIo) {
   const existingIo = res.socket.server.io;
-  const socketPath = "/socket.io";
+  const socketPath = "/api/socket/io";
 
   // Only initialize Socket.IO server once
   if (!existingIo || existingIo.path() !== socketPath) {
@@ -147,6 +210,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
       pingTimeout: RATE_LIMIT.PING_TIMEOUT,
       pingInterval: RATE_LIMIT.PING_INTERVAL,
     });
+
+    const redisUrl = process.env.REDIS_URL;
+    if (redisUrl) {
+      const pubClient = createClient({ url: redisUrl });
+      const subClient = createClient({ url: redisUrl });
+
+      Promise.all([pubClient.connect(), subClient.connect()])
+        .then(() => {
+          io.adapter(createAdapter(pubClient, subClient));
+          console.log("[socket] Redis adapter enabled");
+        })
+        .catch((error) => {
+          console.error("[socket] Redis adapter failed to connect:", error);
+        });
+    }
 
     // Event handlers for real-time updates
     const eventHandlers = new Map<string, (event: unknown) => void>();
@@ -188,12 +266,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
       
       // Authenticate on connect (with timeout)
       const authPromise = validateAuth(socket);
-      const authTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Auth timeout")), 5000)
+      const authTimeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Auth timeout")), 5000),
       );
 
       Promise.race([authPromise, authTimeout])
-        .then((result: any) => {
+        .then((result: Awaited<ReturnType<typeof validateAuth>>) => {
           if (result.valid) {
             isAuthenticated = true;
             userId = result.userId;
@@ -205,7 +283,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
             
             // Track user connections
             if (userId) {
-              let userSockets = userConnections.get(userId) || new Set();
+              const userSockets = userConnections.get(userId) ?? new Set<string>();
               userSockets.add(socket.id);
               userConnections.set(userId, userSockets);
               
@@ -229,8 +307,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
             socket.disconnect();
           }
         })
-        .catch((error) => {
-          console.error(`[socket] Auth error for ${socket.id}:`, error.message);
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : "Authentication failed";
+          console.error(`[socket] Auth error for ${socket.id}:`, message);
           socket.emit("auth_error", { message: "Authentication failed" });
           socket.disconnect();
         });
@@ -240,9 +319,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
       // ========================================
       
       socket.on("ping", () => {
-        if (isAuthenticated) {
-          socket.emit("pong", { timestamp: Date.now() });
+        if (!isAuthenticated) return;
+
+        const now = Date.now();
+        const serverId = socket.data.serverId as string | undefined;
+        const profileId = socket.data.serverProfileId as string | undefined;
+
+        if (serverId && profileId) {
+          setServerPresence(serverId, profileId, true, socket.id, now);
+          emitServerPresence(io, serverId);
         }
+
+        socket.emit("pong", { timestamp: now });
       });
 
       // ========================================
@@ -251,7 +339,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
       
       // Check rate limits on each event
       const originalEmit = socket.emit.bind(socket);
-      socket.emit = function(event: string, ...args: any[]) {
+      socket.emit = function(event: string, ...args: unknown[]) {
         if (!isAuthenticated) return;
         
         if (!checkRateLimit(socket.id, event === "message" ? "message" : "event")) {
@@ -345,23 +433,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
         if (socket.data.serverId && socket.data.serverId !== serverId) {
           const previousServerId = socket.data.serverId as string;
           void socket.leave(`server:${previousServerId}`);
-          updateServerPresence(io, previousServerId);
+          setServerPresence(previousServerId, socket.data.serverProfileId as string | undefined, false);
+          emitServerPresence(io, previousServerId);
         }
         
         socket.data.serverId = serverId;
         socket.data.serverProfileId = profileId;
+        if (profileId) {
+          setServerPresence(serverId, profileId, true, socket.id, Date.now());
+        }
         void Promise.resolve(socket.join(`server:${serverId}`))
-          .then(() => updateServerPresence(io, serverId));
+          .then(() => emitServerPresence(io, serverId));
       });
 
       socket.on("leave-server", (serverId: string) => {
         if (!isAuthenticated || !serverId) return;
         void Promise.resolve(socket.leave(`server:${serverId}`))
-          .then(() => updateServerPresence(io, serverId));
+          .then(() => emitServerPresence(io, serverId));
         
         if (socket.data.serverId === serverId) {
+          setServerPresence(serverId, socket.data.serverProfileId as string | undefined, false, socket.id, Date.now());
           socket.data.serverId = undefined;
           socket.data.serverProfileId = undefined;
+          emitServerPresence(io, serverId);
         }
       });
 
@@ -398,7 +492,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
         
         // Update presence
         if (socket.data.serverId) {
-          updateServerPresence(io, socket.data.serverId as string);
+          const serverId = socket.data.serverId as string;
+          setServerPresence(serverId, socket.data.serverProfileId as string | undefined, false, socket.id, Date.now());
+          emitServerPresence(io, serverId);
         }
       });
 
@@ -415,12 +511,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
 }
 
 // Helper functions
-function updateServerPresence(io: SocketIOServer, serverId: string) {
-  const profileIds = [...new Set(
-    [...io.sockets.sockets.values()]
-      .filter((client) => client.data.serverId === serverId && client.data.serverProfileId)
-      .map((client) => client.data.serverProfileId as string),
-  )];
+function setServerPresence(
+  serverId: string,
+  profileId: string | undefined,
+  online: boolean,
+  socketId?: string,
+  timestamp = Date.now(),
+) {
+  if (!serverId || !profileId) return;
+
+  const presenceMap = serverPresence.get(serverId) ?? new Map<string, { lastSeen: number; socketId: string }>();
+
+  if (online) {
+    presenceMap.set(profileId, { lastSeen: timestamp, socketId: socketId ?? profileId });
+    serverPresence.set(serverId, presenceMap);
+    return;
+  }
+
+  presenceMap.delete(profileId);
+  if (presenceMap.size === 0) {
+    serverPresence.delete(serverId);
+    return;
+  }
+
+  serverPresence.set(serverId, presenceMap);
+}
+
+function emitServerPresence(io: SocketIOServer, serverId: string) {
+  const profileIds = [...(serverPresence.get(serverId)?.keys() ?? [])];
   io.to(`server:${serverId}`).emit("server-presence", profileIds);
 }
 

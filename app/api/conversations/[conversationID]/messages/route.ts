@@ -25,9 +25,18 @@ export async function POST(req: Request, { params }: Context) {
   const conversation = await getConversation((await params).conversationID, profile.id);
   if (!conversation) return new NextResponse("Conversation not found", { status: 404 });
   const member = await db.member.findFirst({ where: { profileId: profile.id, OR: [{ id: conversation.memberOneId }, { id: conversation.memberTwoId }] } });
-  const { content, fileUrl } = await req.json();
+  const { content, fileUrl, encrypted = false } = await req.json();
   if (!member || (!content && !fileUrl)) return new NextResponse("Invalid message", { status: 400 });
-  const message = await db.directMessage.create({ data: { content: content || "Attachment", fileUrl, conversationId: conversation.id, memberId: member.id }, include: { member: { include: { profile: true } } } });
+  const message = await db.directMessage.create({
+    data: {
+      content: content || "Attachment",
+      fileUrl,
+      encrypted: Boolean(encrypted),
+      conversationId: conversation.id,
+      memberId: member.id,
+    },
+    include: { member: { include: { profile: true } } },
+  });
   publishConversationEvent(conversation.id, { type: "created", message });
   return NextResponse.json(message, { status: 201 });
 }

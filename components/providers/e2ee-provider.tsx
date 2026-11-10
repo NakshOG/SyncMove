@@ -1,13 +1,19 @@
 /**
  * E2EE Provider Component
- * 
+ *
  * Wraps the application with E2EE context, providing encryption
  * capabilities to all chat components.
  */
 
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
 import { useE2EE } from "@/hooks/use-e2ee";
 
 interface E2EEContextValue {
@@ -15,14 +21,23 @@ interface E2EEContextValue {
   initialized: boolean;
   hasKeyBundle: boolean;
   isLoading: boolean;
-  
+
   // Message operations
-  encryptForChannel: (channelId: string, plaintext: string) => Promise<string | null>;
-  decryptFromChannel: (channelId: string, ciphertext: string) => Promise<string | null>;
-  
+  encryptForChannel: (
+    channelId: string,
+    plaintext: string,
+  ) => Promise<string | null>;
+  decryptFromChannel: (
+    channelId: string,
+    ciphertext: string,
+  ) => Promise<string | null>;
+
   // Session operations
-  establishChannelSession: (channelId: string, memberIds: string[]) => Promise<void>;
-  
+  establishChannelSession: (
+    channelId: string,
+    memberIds: string[],
+  ) => Promise<void>;
+
   // Key management
   uploadKeyBundle: () => Promise<boolean>;
 }
@@ -39,7 +54,9 @@ export function useE2EEContext() {
 
 export function E2EEProvider({ children }: { children: ReactNode }) {
   const e2ee = useE2EE();
-  const [channelSessions, setChannelSessions] = useState<Map<string, string[]>>(new Map());
+  const [channelSessions, setChannelSessions] = useState<Map<string, string[]>>(
+    new Map(),
+  );
 
   /**
    * Encrypt a message for a channel
@@ -48,23 +65,23 @@ export function E2EEProvider({ children }: { children: ReactNode }) {
    */
   const encryptForChannel = async (
     channelId: string,
-    plaintext: string
+    plaintext: string,
   ): Promise<string | null> => {
     // For channel messages, we need to establish sessions with all members
     // then create a shared sender key for efficient encryption
-    
+
     const memberIds = channelSessions.get(channelId) ?? [];
-    
+
     if (memberIds.length === 0) {
-      // No sessions yet, send plaintext (fallback mode)
-      // In production, you'd queue the message until sessions are established
-      console.warn("[E2EE] No channel sessions, sending plaintext");
-      return plaintext;
+      console.error(
+        "[E2EE] No channel sessions established; refusing to send plaintext.",
+      );
+      return null;
     }
 
     // Encrypt for each member (simplified - production would use Sender Keys)
     const encryptedPerMember: { userId: string; ciphertext: string }[] = [];
-    
+
     for (const memberId of memberIds) {
       const ciphertext = await e2ee.encryptMessage(memberId, plaintext);
       if (ciphertext) {
@@ -76,7 +93,8 @@ export function E2EEProvider({ children }: { children: ReactNode }) {
     }
 
     if (encryptedPerMember.length === 0) {
-      return plaintext; // Fallback
+      console.error("[E2EE] Failed to encrypt channel payload for any member.");
+      return null;
     }
 
     return JSON.stringify({
@@ -91,32 +109,36 @@ export function E2EEProvider({ children }: { children: ReactNode }) {
    */
   const decryptFromChannel = async (
     channelId: string,
-    ciphertext: string
+    ciphertext: string,
   ): Promise<string | null> => {
     // Check if it's encrypted format
     if (!ciphertext.startsWith("{")) {
-      // Plaintext message (fallback or non-E2EE member)
-      return ciphertext;
+      return null;
     }
 
     try {
       const parsed = JSON.parse(ciphertext);
-      
+
       if (parsed.v === 1 && parsed.type === "channel") {
         // Find our ciphertext in the array
         const memberIds = channelSessions.get(channelId) ?? [];
-        
+
         for (const enc of parsed.encrypted) {
           // Try to decrypt with any session we have
-          const ciphertextBytes = new Uint8Array(enc.ciphertext.split(",").map(Number));
-          const decrypted = await e2ee.decryptMessage(enc.userId, ciphertextBytes);
+          const ciphertextBytes = new Uint8Array(
+            enc.ciphertext.split(",").map(Number),
+          );
+          const decrypted = await e2ee.decryptMessage(
+            enc.userId,
+            ciphertextBytes,
+          );
           if (decrypted) return decrypted;
         }
       }
-      
-      return null; // Could not decrypt
+
+      return null;
     } catch {
-      return ciphertext; // Fallback to plaintext
+      return null;
     }
   };
 
@@ -125,7 +147,7 @@ export function E2EEProvider({ children }: { children: ReactNode }) {
    */
   const establishChannelSession = async (
     channelId: string,
-    memberIds: string[]
+    memberIds: string[],
   ) => {
     setChannelSessions((prev) => new Map(prev).set(channelId, memberIds));
 

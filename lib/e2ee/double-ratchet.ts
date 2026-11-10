@@ -8,6 +8,7 @@
  * continuous key ratcheting after each message.
  */
 
+import { x25519 } from "@noble/curves/ed25519.js";
 import { hkdf } from "./hkdf";
 import { sha256, concatArrays, randomBytes } from "./sha256";
 
@@ -386,38 +387,8 @@ export function deserializeHeader(bytes: Uint8Array): MessageHeader {
  * X25519 Diffie-Hellman (imported from x3dh, duplicated for self-containment)
  */
 async function dh(privateKey: Uint8Array, publicKey: Uint8Array): Promise<Uint8Array> {
-  try {
-    const privateCryptoKey = await crypto.subtle.importKey(
-      "raw",
-      privateKey,
-      { name: "ECDH", namedCurve: "X25519" },
-      false,
-      ["deriveBits"]
-    );
-    
-    const publicCryptoKey = await crypto.subtle.importKey(
-      "raw",
-      publicKey,
-      { name: "ECDH", namedCurve: "X25519" },
-      false,
-      []
-    );
-    
-    const sharedBits = await crypto.subtle.deriveBits(
-      { name: "ECDH", public: publicCryptoKey },
-      privateCryptoKey,
-      256
-    );
-    
-    return new Uint8Array(sharedBits);
-  } catch {
-    // Fallback for environments without X25519
-    const fallback = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) {
-      fallback[i] = privateKey[i] ^ publicKey[i] ^ 0xAB;
-    }
-    return fallback;
-  }
+  const shared = x25519.getSharedSecret(privateKey, publicKey);
+  return new Uint8Array(shared);
 }
 
 /**
@@ -435,18 +406,11 @@ function arraysEqual(a: Uint8Array, b: Uint8Array): boolean {
  * Generate new DH key pair for ratchet
  */
 export async function generateRatchetKeyPair(): Promise<{ publicKey: Uint8Array; privateKey: Uint8Array }> {
-  const keyPair = await crypto.subtle.generateKey(
-    { name: "ECDH", namedCurve: "X25519" },
-    true,
-    ["deriveBits"]
-  );
-  
-  const publicKey = await crypto.subtle.exportKey("raw", keyPair.publicKey);
-  const privateKey = await crypto.subtle.exportKey("raw", keyPair.privateKey);
-  
+  const keyPair = x25519.keygen();
+
   return {
-    publicKey: new Uint8Array(publicKey),
-    privateKey: new Uint8Array(privateKey),
+    publicKey: new Uint8Array(keyPair.publicKey),
+    privateKey: new Uint8Array(keyPair.secretKey),
   };
 }
 

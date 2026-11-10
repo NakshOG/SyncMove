@@ -1,14 +1,40 @@
+
 /**
  * E2EE Module Exports
- * 
- * Zero-knowledge end-to-end encryption based on Signal Protocol
- * 
+ *
+ * Zero-knowledge end-to-end encryption based on Signal Protocol.
+ *
  * References:
  * - https://signal.org/docs/specifications/x3dh/
  * - https://signal.org/docs/specifications/doubleratchet/
  */
 
-// X3DH Key Exchange
+// ============================================================
+// IMPORTS REQUIRED BY LOCAL FUNCTIONS
+// ============================================================
+
+import {
+  type IdentityKeyPair,
+  type KeyBundle,
+  type SignedPreKeyPair,
+  type OneTimePreKeyPair,
+  generateKeyPair,
+  generateSignedPreKey,
+  generateOneTimePreKeys,
+  createKeyBundle,
+} from "./x3dh";
+
+import type { SessionManager } from "./session";
+
+import {
+  toBase64,
+  fromBase64,
+} from "./sha256";
+
+// ============================================================
+// X3DH KEY EXCHANGE
+// ============================================================
+
 export {
   type IdentityKeyPair,
   type SignedPreKeyPair,
@@ -16,6 +42,7 @@ export {
   type KeyBundle,
   type InitialMessage,
   type X3DHResult,
+
   generateKeyPair,
   generateSignedPreKey,
   generateOneTimePreKeys,
@@ -26,12 +53,16 @@ export {
   deserializeKeyBundle,
 } from "./x3dh";
 
-// Double Ratchet
+// ============================================================
+// DOUBLE RATCHET
+// ============================================================
+
 export {
   type DoubleRatchetState,
   type MessageHeader,
   type EncryptedMessage,
   type InitialState,
+
   createInitialState,
   encryptMessage,
   decryptMessage,
@@ -40,61 +71,88 @@ export {
   deserializeState,
 } from "./double-ratchet";
 
-// Key Storage
+// ============================================================
+// KEY STORAGE
+// ============================================================
+
 export {
   type KeyStorage,
   IndexedDBKeyStorage,
   type SessionData,
   SessionStorage,
   BundleStorage,
+
   keyStorage,
   sessionStorage,
   bundleStorage,
+
   exportKeysWithPassword,
   importKeysFromPassword,
 } from "./key-storage";
 
-// Session Management
+// ============================================================
+// SESSION MANAGEMENT
+// ============================================================
+
 export {
   type SessionStatus,
   type E2EESession,
+
   SessionManager,
   sessionManager,
 } from "./session";
 
-// File Encryption
+// ============================================================
+// FILE ENCRYPTION
+// ============================================================
+
 export {
   type EncryptedFileMetadata,
   type EncryptedFile,
   type EncryptionResult,
   type EncryptionProgressCallback,
+
   encryptFile,
   decryptFile,
   generateFileKey,
   encryptKeyForRecipients,
   decryptKeyForRecipient,
-  compress,
-  decompress,
+
+  // Aliases avoid duplicate exports.
+  compress as compressFile,
+  decompress as decompressFile,
+
   encryptFileWithProgress,
   calculateCompressionRatio,
 } from "./file-encryption";
 
-// Compression
+// ============================================================
+// COMPRESSION
+// ============================================================
+
 export {
   type CompressionAlgorithm,
   type CompressionResult,
+
   getAvailableCompression,
+
+  // These are the default compression exports.
   compress,
   decompress,
+
   compressText,
   decompressToText,
   estimateCompressionRatio,
   shouldCompress,
+
   StreamingCompressor,
   StreamingDecompressor,
 } from "./compression";
 
-// Utility functions
+// ============================================================
+// SHA256 UTILITIES
+// ============================================================
+
 export {
   sha256,
   sha256Hex,
@@ -104,6 +162,10 @@ export {
   randomBytes,
 } from "./sha256";
 
+// ============================================================
+// HKDF
+// ============================================================
+
 export {
   hkdf,
   hkdfExtract,
@@ -111,31 +173,36 @@ export {
   deriveMessageKeys,
 } from "./hkdf";
 
-/**
- * Quick start: Initialize E2EE for a user
- */
+// ============================================================
+// INITIALIZE E2EE
+// ============================================================
+
 export async function initializeE2EE(): Promise<{
   identityKey: IdentityKeyPair;
-  signedPreKey: any;
-  oneTimePreKeys: any[];
+  signedPreKey: SignedPreKeyPair;
+  oneTimePreKeys: OneTimePreKeyPair[];
   keyBundle: KeyBundle;
 }> {
-  // Generate identity key
+  // Generate identity key pair.
   const identityKey = await generateKeyPair();
-  
-  // Generate signed pre-key
+
+  // Generate signed pre-key.
   const signedPreKey = await generateSignedPreKey(identityKey);
-  
-  // Generate one-time pre-keys
+
+  // Generate one-time pre-keys.
   const oneTimePreKeys = await generateOneTimePreKeys(100);
-  
-  // Create bundle
+
+  if (!oneTimePreKeys || oneTimePreKeys.length === 0) {
+    throw new Error("Failed to generate one-time pre-keys");
+  }
+
+  // Create key bundle.
   const keyBundle = await createKeyBundle(
     identityKey,
     signedPreKey,
     oneTimePreKeys[0]
   );
-  
+
   return {
     identityKey,
     signedPreKey,
@@ -144,49 +211,85 @@ export async function initializeE2EE(): Promise<{
   };
 }
 
-/**
- * Type definition for encrypted message payload
- */
+// ============================================================
+// ENCRYPTED MESSAGE PAYLOAD
+// ============================================================
+
 export interface EncryptedPayload {
-  version: number;          // Protocol version (1)
-  senderId: string;         // Sender's user ID
-  sessionId: string;        // Session ID
-  encrypted: string;        // Base64-encoded encrypted message
-  timestamp: number;        // Send timestamp
+  version: number;
+  senderId: string;
+  sessionId: string;
+  encrypted: string;
+  timestamp: number;
 }
 
-/**
- * Encrypt a message for a peer
- */
+// ============================================================
+// ENCRYPT MESSAGE FOR PEER
+// ============================================================
+
 export async function encryptForPeer(
   message: string,
   peerId: string,
-  sessionManager: SessionManager
+  manager: SessionManager
 ): Promise<EncryptedPayload> {
+  if (!message) {
+    throw new Error("Message cannot be empty");
+  }
+
+  if (!peerId) {
+    throw new Error("Peer ID is required");
+  }
+
   const encoder = new TextEncoder();
   const plaintext = encoder.encode(message);
-  
-  const { ciphertext } = await sessionManager.encryptForPeer(peerId, plaintext);
-  
+
+  const result = await manager.encryptForPeer(
+    peerId,
+    plaintext
+  );
+
   return {
     version: 1,
-    senderId: sessionManager["myKeyId"],
-    sessionId: "", // Will be filled by caller
-    encrypted: toBase64(ciphertext),
+
+    // Uses the existing SessionManager identity property.
+    senderId: (manager as unknown as {
+      myKeyId: string;
+    }).myKeyId,
+
+    sessionId: result.sessionId,
+
+    encrypted: toBase64(result.ciphertext),
+
     timestamp: Date.now(),
   };
 }
 
-/**
- * Decrypt a message from a peer
- */
+// ============================================================
+// DECRYPT MESSAGE FROM PEER
+// ============================================================
+
 export async function decryptFromPeer(
   payload: EncryptedPayload,
-  sessionManager: SessionManager
+  manager: SessionManager
 ): Promise<string> {
+  if (payload.version !== 1) {
+    throw new Error(
+      `Unsupported E2EE version: ${payload.version}`
+    );
+  }
+
+  if (!payload.senderId || !payload.encrypted) {
+    throw new Error("Invalid encrypted message payload");
+  }
+
   const encrypted = fromBase64(payload.encrypted);
-  const plaintext = await sessionManager.decryptFromPeer(payload.senderId, encrypted);
-  
+
+  const plaintext = await manager.decryptFromPeer(
+    payload.senderId,
+    encrypted
+  );
+
   const decoder = new TextDecoder();
+
   return decoder.decode(plaintext);
 }

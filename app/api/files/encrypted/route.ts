@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       return new NextResponse("Upload failed", { status: 500 });
     }
 
-    const fileUrl = uploadResult[0].ufsUrl;
+    const fileUrl = uploadResult[0]?.data?.ufsUrl ?? uploadResult[0]?.data?.url ?? "";
 
     // Create a message with the file attachment
     const member = await db.member.findFirst({

@@ -8,6 +8,7 @@
  * enabling asynchronous encryption (parties don't need to be online simultaneously).
  */
 
+import { x25519, ed25519 } from "@noble/curves/ed25519.js";
 import { hkdf } from "./hkdf";
 import { sha256 } from "./sha256";
 
@@ -15,8 +16,10 @@ import { sha256 } from "./sha256";
  * Key types for X3DH
  */
 export interface IdentityKeyPair {
-  publicKey: Uint8Array;    // 32 bytes (X25519)
-  privateKey: Uint8Array;   // 32 bytes (X25519)
+  publicKey: Uint8Array;          // 32 bytes (X25519)
+  privateKey: Uint8Array;         // 32 bytes (X25519)
+  signingPublicKey?: Uint8Array;  // 32 bytes (Ed25519)
+  signingPrivateKey?: Uint8Array; // 32 bytes (Ed25519)
 }
 
 export interface SignedPreKeyPair {
@@ -50,6 +53,7 @@ export interface KeyBundle {
 export interface InitialMessage {
   senderIdentityKey: Uint8Array;
   ephemeralKey: Uint8Array;
+  ephemeralPrivateKey?: Uint8Array;
   usedOneTimePreKeyId: string | null;
   senderPreKeyBundle: KeyBundle;
 }
@@ -98,24 +102,31 @@ export async function x3dhInitiator(
   
   // Combine DH outputs using HKDF
   const combined = combineDHSecret(dh1, dh2, dh3, dh4);
-  const result = await hkdf(combined, null, INFO, 64);
-  
-  // Build initial message
+  const derivedKeyMaterial = await hkdf(combined, null, INFO, 64);
+
+  const senderSignedPreKey = await generateSignedPreKey(myIdentityKey);
   const initialMessage: InitialMessage = {
     senderIdentityKey: myIdentityKey.publicKey,
     ephemeralKey: ephemeralKey.publicKey,
+    ephemeralPrivateKey: ephemeralKey.privateKey,
     usedOneTimePreKeyId,
     senderPreKeyBundle: {
       identityKey: myIdentityKey.publicKey,
-      signedPreKeyId: "", // Will be set by caller
-      signedPreKey: (await generateKeyPair()).publicKey, // Placeholder
-      signedPreKeySignature: new Uint8Array(64),
+      signedPreKeyId: senderSignedPreKey.keyId,
+      signedPreKey: senderSignedPreKey.publicKey,
+      signedPreKeySignature: senderSignedPreKey.signature,
       oneTimePreKeyId: null,
       oneTimePreKey: null,
     },
   };
-  
-  return { initialMessage, result };
+
+  return {
+    initialMessage,
+    result: {
+      sharedSecret: derivedKeyMaterial.slice(0, 32),
+      derivedKeyMaterial,
+    },
+  };
 }
 
 /**
@@ -149,9 +160,12 @@ export async function x3dhResponder(
   
   // Combine DH outputs using HKDF
   const combined = combineDHSecret(dh1, dh2, dh3, dh4);
-  const result = await hkdf(combined, null, INFO, 64);
-  
-  return result;
+  const derivedKeyMaterial = await hkdf(combined, null, INFO, 64);
+
+  return {
+    sharedSecret: derivedKeyMaterial.slice(0, 32),
+    derivedKeyMaterial,
+  };
 }
 
 /**
@@ -179,62 +193,29 @@ function combineDHSecret(
 }
 
 /**
- * X25519 Diffie-Hellman
+ * X25519 Diffie-Hellman via noble curves so it works across browsers without
+ * relying on native WebCrypto support for X25519.
  */
 export async function dh(privateKey: Uint8Array, publicKey: Uint8Array): Promise<Uint8Array> {
-  // Use Web Crypto API for X25519
-  try {
-    const privateCryptoKey = await crypto.subtle.importKey(
-      "raw",
-      privateKey,
-      { name: "ECDH", namedCurve: "X25519" },
-      false,
-      ["deriveBits"]
-    );
-    
-    const publicCryptoKey = await crypto.subtle.importKey(
-      "raw",
-      publicKey,
-      { name: "ECDH", namedCurve: "X25519" },
-      false,
-      []
-    );
-    
-    const sharedBits = await crypto.subtle.deriveBits(
-      { name: "ECDH", public: publicCryptoKey },
-      privateCryptoKey,
-      256
-    );
-    
-    return new Uint8Array(sharedBits);
-  } catch (e) {
-    // Fallback: Simple XOR-based derivation (for development/testing only)
-    // In production, this should throw an error
-    console.warn("X25519 not available, using fallback");
-    const fallback = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) {
-      fallback[i] = privateKey[i] ^ publicKey[i] ^ 0xAB;
-    }
-    return fallback;
-  }
+  const normalizedPrivate = normalizeX25519PrivateKey(privateKey);
+  const normalizedPublic = normalizeX25519PublicKey(publicKey);
+
+  const shared = x25519.getSharedSecret(normalizedPrivate, normalizedPublic);
+  return new Uint8Array(shared);
 }
 
 /**
- * Generate X25519 key pair
+ * Generate X25519 key pair with a browser-safe noble implementation.
  */
 export async function generateKeyPair(): Promise<IdentityKeyPair> {
-  const keyPair = await crypto.subtle.generateKey(
-    { name: "ECDH", namedCurve: "X25519" },
-    true,
-    ["deriveBits"]
-  );
-  
-  const publicKey = await crypto.subtle.exportKey("raw", keyPair.publicKey);
-  const privateKey = await crypto.subtle.exportKey("raw", keyPair.privateKey);
-  
+  const xKeyPair = x25519.keygen();
+  const signingKeyPair = ed25519.keygen();
+
   return {
-    publicKey: new Uint8Array(publicKey),
-    privateKey: new Uint8Array(privateKey),
+    publicKey: new Uint8Array(xKeyPair.publicKey),
+    privateKey: new Uint8Array(xKeyPair.secretKey),
+    signingPublicKey: new Uint8Array(signingKeyPair.publicKey),
+    signingPrivateKey: new Uint8Array(signingKeyPair.secretKey),
   };
 }
 
@@ -244,13 +225,10 @@ export async function generateKeyPair(): Promise<IdentityKeyPair> {
 export async function generateSignedPreKey(
   identityKey: IdentityKeyPair
 ): Promise<SignedPreKeyPair> {
-  // Generate X25519 key pair for SPK
   const spk = await generateKeyPair();
-  const keyId = crypto.randomUUID();
-  
-  // Sign SPK public with identity key (Ed25519)
+  const keyId = crypto.randomUUID ? crypto.randomUUID() : `spk-${Date.now()}-${Math.random()}`;
   const signature = await signWithIdentityKey(identityKey, spk.publicKey);
-  
+
   return {
     keyId,
     publicKey: spk.publicKey,
@@ -282,49 +260,44 @@ async function signWithIdentityKey(
   identityKey: IdentityKeyPair,
   data: Uint8Array
 ): Promise<Uint8Array> {
-  // Generate Ed25519 key pair from X25519 identity key (deterministic)
-  // In production, you'd typically use separate signing keys
-  const signingKey = await crypto.subtle.generateKey(
-    { name: "Ed25519" },
-    true,
-    ["sign", "verify"]
-  );
-  
-  const signature = await crypto.subtle.sign(
-    undefined,
-    signingKey.privateKey,
-    data
-  );
-  
-  return new Uint8Array(signature);
+  const signingPrivateKey = identityKey.signingPrivateKey ?? ed25519.keygen().secretKey;
+  return new Uint8Array(ed25519.sign(data, signingPrivateKey));
 }
 
 /**
- * Verify signature of signed pre-key
+ * Verify signature of signed pre-key.
+ * Accepts either the raw Ed25519 public key or the full identity pair.
  */
 export async function verifySignedPreKeySignature(
-  identityKey: Uint8Array,
+  identityKey: Uint8Array | IdentityKeyPair,
   signedPreKey: Uint8Array,
   signature: Uint8Array
 ): Promise<boolean> {
   try {
-    const publicKey = await crypto.subtle.importKey(
-      "raw",
-      identityKey,
-      { name: "Ed25519" },
-      false,
-      ["verify"]
-    );
-    
-    return await crypto.subtle.verify(
-      undefined,
-      publicKey,
-      signature,
-      signedPreKey
-    );
+    const signingPublicKey = identityKey instanceof Uint8Array
+      ? identityKey
+      : (identityKey.signingPublicKey ?? identityKey.publicKey);
+
+    return ed25519.verify(signature, signedPreKey, signingPublicKey);
   } catch {
     return false;
   }
+}
+
+function normalizeX25519PrivateKey(value: Uint8Array): Uint8Array {
+  const normalized = new Uint8Array(value);
+  if (normalized.length !== 32) {
+    throw new Error("X25519 private keys must be 32 bytes");
+  }
+  return normalized;
+}
+
+function normalizeX25519PublicKey(value: Uint8Array): Uint8Array {
+  const normalized = new Uint8Array(value);
+  if (normalized.length !== 32) {
+    throw new Error("X25519 public keys must be 32 bytes");
+  }
+  return normalized;
 }
 
 /**

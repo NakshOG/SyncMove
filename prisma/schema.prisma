@@ -6,6 +6,7 @@ generator client {
 datasource db {
   provider = "mysql"
 }
+
 model Profile {
   id       String @id @default(uuid())
   userId   String @unique
@@ -55,17 +56,17 @@ model Member {
   profileId String
   profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-  messages Message[]
-  directMessages DirectMessage[]
-  conversationsInitiated Conversation[] @relation("ConversationMemberOne")
-  conversationsReceived Conversation[] @relation("ConversationMemberTwo")
+  messages               Message[]
+  directMessages         DirectMessage[]
+  conversationsInitiated Conversation[]  @relation("ConversationMemberOne")
+  conversationsReceived  Conversation[]  @relation("ConversationMemberTwo")
 
   CreatedAt DateTime @default(now())
   UpdatedAt DateTime @updatedAt
 
+  @@unique([profileId, serverId])
   @@index([serverId])
   @@index([profileId])
-  @@unique([profileId, serverId])
 }
 
 enum ChannelType {
@@ -83,8 +84,8 @@ model Channel {
   server   Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
 
   profileId String
-  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  messages Message[]
+  profile   Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  messages  Message[]
 
   CreatedAt DateTime @default(now())
   UpdatedAt DateTime @updatedAt
@@ -94,54 +95,59 @@ model Channel {
 }
 
 model Message {
-  id String @id @default(uuid())
-  content String @db.Text
-  fileUrl String? @db.Text
-  deleted Boolean @default(false)
-  pinned Boolean @default(false)
-  memberId String
-  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  fileUrl   String?  @db.Text
+  encrypted Boolean  @default(false)
+  deleted   Boolean  @default(false)
+  pinned    Boolean  @default(false)
+  memberId  String
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
   channelId String
-  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   CreatedAt DateTime @default(now())
   UpdatedAt DateTime @updatedAt
+
   @@index([memberId])
   @@index([channelId])
 }
 
 model Conversation {
-  id String @id @default(uuid())
-  memberOneId String
-  memberTwoId String
-  memberOne Member @relation("ConversationMemberOne", fields: [memberOneId], references: [id], onDelete: Cascade)
-  memberTwo Member @relation("ConversationMemberTwo", fields: [memberTwoId], references: [id], onDelete: Cascade)
+  id             String          @id @default(uuid())
+  memberOneId    String
+  memberTwoId    String
+  memberOne      Member          @relation("ConversationMemberOne", fields: [memberOneId], references: [id], onDelete: Cascade)
+  memberTwo      Member          @relation("ConversationMemberTwo", fields: [memberTwoId], references: [id], onDelete: Cascade)
   directMessages DirectMessage[]
+
   @@unique([memberOneId, memberTwoId])
   @@index([memberOneId])
   @@index([memberTwoId])
 }
 
 model DirectMessage {
-  id String @id @default(uuid())
-  content String @db.Text
-  fileUrl String? @db.Text
-  deleted Boolean @default(false)
-  memberId String
-  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  id             String       @id @default(uuid())
+  content        String       @db.Text
+  fileUrl        String?      @db.Text
+  encrypted      Boolean      @default(false)
+  deleted        Boolean      @default(false)
+  memberId       String
+  member         Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
   conversationId String
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  CreatedAt DateTime @default(now())
-  UpdatedAt DateTime @updatedAt
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  CreatedAt      DateTime     @default(now())
+  UpdatedAt      DateTime     @updatedAt
+
   @@index([memberId])
   @@index([conversationId])
 }
 
 model CallSignal {
-  id String @id @default(uuid())
-  roomId String
-  senderId String
-  kind String
-  payload String @db.Text
+  id        String   @id @default(uuid())
+  roomId    String
+  senderId  String
+  kind      String
+  payload   String   @db.Text
   CreatedAt DateTime @default(now())
 
   @@index([roomId, CreatedAt])
@@ -152,22 +158,22 @@ model CallSignal {
 // ============================================
 
 model KeyBundle {
-  id            String   @id @default(uuid())
-  userId        String   @unique
-  
+  id     String @id @default(uuid())
+  userId String @unique
+
   // Identity Key (X25519 public key, base64 encoded)
-  identityKey   String   @db.Text
-  
+  identityKey String @db.Text
+
   // Signed Pre-Key (X25519 public key)
-  signedPreKey  String   @db.Text
-  signature     String   @db.Text  // Ed25519 signature of SPK
-  
+  signedPreKey String @db.Text
+  signature    String @db.Text // Ed25519 signature of SPK
+
   // One-Time Pre-Key (X25519 public key) - null when exhausted
   oneTimePreKeyId String?
   oneTimePreKey   String? @db.Text
-  
-  created       DateTime @default(now())
-  updated       DateTime @updatedAt
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
 
   @@index([userId])
 }

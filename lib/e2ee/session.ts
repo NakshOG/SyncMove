@@ -11,6 +11,8 @@ import {
   KeyBundle,
   InitialMessage,
   X3DHResult,
+  generateSignedPreKey,
+  generateOneTimePreKeys,
 } from "./x3dh";
 import {
   createInitialState,
@@ -62,6 +64,8 @@ interface QueuedMessage {
 export class SessionManager {
   private myIdentityKey: IdentityKeyPair | null = null;
   private myKeyId: string = "";
+  private mySignedPreKey: Awaited<ReturnType<typeof generateSignedPreKey>> | null = null;
+  private myOneTimePreKey: Awaited<ReturnType<typeof generateOneTimePreKeys>>[number] | null = null;
   private messageQueue: Map<string, QueuedMessage[]> = new Map();
   private maxQueueAttempts: number = 10;
   
@@ -71,8 +75,9 @@ export class SessionManager {
   async initialize(identityKey: IdentityKeyPair, keyId: string): Promise<void> {
     this.myIdentityKey = identityKey;
     this.myKeyId = keyId;
-    
-    // Try to restore existing sessions
+    this.mySignedPreKey = await generateSignedPreKey(identityKey);
+    this.myOneTimePreKey = (await generateOneTimePreKeys(1))[0] ?? null;
+
     await this.restoreSessions();
   }
   
@@ -102,10 +107,10 @@ export class SessionManager {
     
     // Create session state
     const state = createInitialState(
-      result.sharedSecret.slice(0, 32), // rootKey (32 bytes)
-      this.myIdentityKey.privateKey,    // localEphemeralPrivate
-      this.myIdentityKey.publicKey,     // localEphemeralPublic
-      peerBundle.identityKey           // remoteEphemeralPublic
+      result.sharedSecret,
+      initialMessage.ephemeralPrivateKey ?? this.myIdentityKey.privateKey,
+      initialMessage.ephemeralKey,
+      peerBundle.identityKey
     );
     
     const session: E2EESession = {
@@ -163,10 +168,10 @@ export class SessionManager {
     
     // Create session state
     const state = createInitialState(
-      result.sharedSecret.slice(0, 32),
-      this.myIdentityKey.privateKey,
-      initialMessage.ephemeralKey, // Our ephemeral becomes the remote's perspective
-      initialMessage.senderIdentityKey
+      result.sharedSecret,
+      this.mySignedPreKey?.privateKey ?? this.myIdentityKey.privateKey,
+      this.mySignedPreKey?.publicKey ?? this.myIdentityKey.publicKey,
+      initialMessage.ephemeralKey
     );
     
     const session: E2EESession = {
@@ -364,26 +369,33 @@ export class SessionManager {
    * Restore all sessions from storage
    */
   private async restoreSessions(): Promise<void> {
-    // Load all sessions and restore their state
-    // This is called on initialization
+    const existing = await sessionStorage.getSessionsByPeer(this.myKeyId);
+    if (existing.length === 0) return;
+
+    for (const item of existing) {
+      if (item.status === "closed") continue;
+      await this.loadSessionState(item);
+    }
   }
   
   /**
    * Load user's signed pre-key (for responder)
    */
-  private async loadMySignedPreKey(): Promise<any> {
-    // In real implementation, load from IndexedDB
-    // For now, return placeholder
-    return null;
+private async loadMySignedPreKey(): Promise<Awaited<ReturnType<typeof generateSignedPreKey>> | null> {
+    if (!this.mySignedPreKey && this.myIdentityKey) {
+      this.mySignedPreKey = await generateSignedPreKey(this.myIdentityKey);
+    }
+    return this.mySignedPreKey;
   }
-  
+
   /**
    * Load user's one-time pre-key (for responder)
    */
-  private async loadMyOneTimePreKey(): Promise<any> {
-    // In real implementation, load from IndexedDB
-    // For now, return placeholder
-    return null;
+  private async loadMyOneTimePreKey(): Promise<Awaited<ReturnType<typeof generateOneTimePreKeys>>[number] | null> {
+    if (!this.myOneTimePreKey && this.myIdentityKey) {
+      this.myOneTimePreKey = (await generateOneTimePreKeys(1))[0] ?? null;
+    }
+    return this.myOneTimePreKey;
   }
   
   /**

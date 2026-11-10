@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface RelativeTimestampProps {
@@ -17,19 +22,21 @@ function formatRelativeTime(date: Date): string {
   const days = Math.floor(diff / 86400000);
 
   if (minutes < 1) return "Just now";
-  if (minutes < 60) return ${minutes}m ago;
-  if (hours < 24) return ${hours}h ago;
-  if (days < 7) return ${days}d ago;
-  
-  return date.toLocaleDateString([], { 
-    month: "short", 
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+
+  return date.toLocaleDateString([], {
+    month: "short",
     day: "numeric",
-    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined
+    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
   });
 }
 
 export function RelativeTimestamp({ date, className }: RelativeTimestampProps) {
-  const [relative, setRelative] = useState(() => formatRelativeTime(new Date(date)));
+  const [relative, setRelative] = useState(() =>
+    formatRelativeTime(new Date(date)),
+  );
 
   useEffect(() => {
     const update = () => setRelative(formatRelativeTime(new Date(date)));
@@ -40,14 +47,19 @@ export function RelativeTimestamp({ date, className }: RelativeTimestampProps) {
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <time className={cn("text-[11px] text-[#949ba4] cursor-help", className)}>
-            {relative}
-          </time>
-        </TooltipTrigger>
-        <TooltipContent>
-          {new Date(date).toLocaleString()}
-        </TooltipContent>
+        <TooltipTrigger
+          render={
+            <time
+              className={cn(
+                "cursor-help text-[11px] text-[#949ba4]",
+                className,
+              )}
+            >
+              {relative}
+            </time>
+          }
+        />
+        <TooltipContent>{new Date(date).toLocaleString()}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

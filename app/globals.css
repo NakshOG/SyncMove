@@ -222,11 +222,6 @@ body,
 
 @layer utilities {
   /* Give the voice/video stage a roomier desktop treatment without changing mobile sizing. */
-  }
-}
-
-@layer utilities {
-  /* Give the voice/video stage a roomier desktop treatment without changing mobile sizing. */
   @media (min-width: 768px) {
     div.max-w-5xl:has(video) {
       max-width: 80rem;

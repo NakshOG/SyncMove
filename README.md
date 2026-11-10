@@ -10,6 +10,7 @@ A desktop-first, zero-knowledge E2EE video chat and messaging platform built wit
 - **Secure File Sharing** - Compress-then-encrypt workflow before upload
 - **WebRTC Video/Audio Calls** - DTLS-SRTP enforced, TURN support for NAT traversal
 - **Socket Security** - Clerk authentication, heartbeat, rate limiting, flood detection
+- **Distributed Real-Time** - Socket.IO + Redis adapter for multi-instance rooms, presence, and pub/sub fanout
 - **Zero-Knowledge Architecture** - Server cannot decrypt any user communications
 
 ## Tech Stack
@@ -17,9 +18,10 @@ A desktop-first, zero-knowledge E2EE video chat and messaging platform built wit
 - **Frontend**: Next.js 16, React, TailwindCSS, Lucide Icons
 - **Backend**: Next.js API Routes, Prisma ORM
 - **Database**: MariaDB
+- **Realtime Coordination**: Socket.IO + Redis adapter + Redis pub/sub
+- **Presence & Scale**: server-side TTL-based presence map with cross-instance fanout
 - **Auth**: Clerk
-- **File Storage**: UploadThing
-- **Real-time**: Socket.IO
+- **File Storage**: UploadThing / S3-compatible storage
 - **WebRTC**: Native browser APIs with Coturn TURN server
 - **Encryption**: Web Crypto API (X3DH, Double Ratchet, AES-GCM)
 
@@ -37,16 +39,17 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed system design documentation.
 ### Docker Deployment (Recommended)
 
 ```bash
-# 1. Copy environment file
-cp .env.example .env
+# 1. Create a .env file in the project root
+#    Example: DATABASE_URL, REDIS_URL, Clerk keys, UploadThing keys, TURN keys
 
 # 2. Configure your environment variables in .env
 #    - Database credentials
+#    - Redis credentials (or local Redis URL)
 #    - Clerk authentication keys
 #    - UploadThing credentials
 #    - TURN server credentials
 
-# 3. Start all services (app, database, TURN server)
+# 3. Start all services (app, database, Redis, TURN server)
 docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
 
 # 4. Access the application
@@ -60,15 +63,20 @@ docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
 npm install
 
 # Configure environment
-cp .env.example .env
-# Edit .env with your credentials
+# Create a .env file and add your credentials
+# Edit .env with your database, Redis, Clerk, UploadThing, and TURN values
 
-# Start database (MariaDB)
+# Start database and Redis
+
 docker run -d --name syncmove-db \
   -p 3306:3306 \
   -e MYSQL_ROOT_PASSWORD=rootpassword \
   -e MYSQL_DATABASE=syncmove \
   mariadb:10.11
+
+docker run -d --name syncmove-redis \
+  -p 6379:6379 \
+  redis:7-alpine
 
 # Run database migrations
 npx prisma db push
@@ -91,17 +99,18 @@ docker-compose -f docker-compose.coturn.yml up -d
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | MySQL connection string | Yes |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk public key | Yes |
-| `CLERK_SECRET_KEY` | Clerk secret key | Yes |
-| `UPLOADTHING_SECRET` | UploadThing secret key | Yes |
-| `UPLOADTHING_APP_ID` | UploadThing app ID | Yes |
-| `UPLOADTHING_TOKEN` | UploadThing API token | Yes |
-| `NEXT_PUBLIC_TURN_SERVER_URL` | TURN server URL | No |
-| `NEXT_PUBLIC_TURN_USERNAME` | TURN username | No |
-| `NEXT_PUBLIC_TURN_CREDENTIAL` | TURN credential | No |
+| Variable                            | Description                                              | Required                                       |
+| ----------------------------------- | -------------------------------------------------------- | ---------------------------------------------- |
+| `DATABASE_URL`                      | MariaDB/MySQL connection string                          | Yes                                            |
+| `REDIS_URL`                         | Redis connection string for distributed realtime scaling | No (recommended for multi-instance deployment) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk public key                                         | Yes                                            |
+| `CLERK_SECRET_KEY`                  | Clerk secret key                                         | Yes                                            |
+| `UPLOADTHING_SECRET`                | UploadThing secret key                                   | Yes                                            |
+| `UPLOADTHING_APP_ID`                | UploadThing app ID                                       | Yes                                            |
+| `UPLOADTHING_TOKEN`                 | UploadThing API token                                    | Yes                                            |
+| `NEXT_PUBLIC_TURN_SERVER_URL`       | TURN server URL                                          | No                                             |
+| `NEXT_PUBLIC_TURN_USERNAME`         | TURN username                                            | No                                             |
+| `NEXT_PUBLIC_TURN_CREDENTIAL`       | TURN credential                                          | No                                             |
 
 ## Project Structure
 
@@ -127,10 +136,12 @@ docker-compose -f docker-compose.coturn.yml up -d
 │   └── *.ts               # Utility libraries
 ├── prisma/
 │   └── schema.prisma      # Database schema
-├── docker-compose.yml     # Main compose (app + db)
+├── docker-compose.yml     # Main compose (app + db + Redis)
 ├── docker-compose.override.yml  # App + Coturn
 ├── docker-compose.coturn.yml    # Coturn TURN server
-└── Dockerfile             # Application container
+├── lib/redis.ts           # Redis client factory for distributed realtime
+├── Dockerfile             # Application container
+└── .env                   # Local environment configuration
 ```
 
 ## Security Model

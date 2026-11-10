@@ -11,13 +11,20 @@ interface FileUploadProps {
 }
 
 const compressImage = async (file: File, maxDimension: number) => {
-  if (!file.type.startsWith("image/") || file.type === "image/gif" || file.type === "image/svg+xml") {
+  if (
+    !file.type.startsWith("image/") ||
+    file.type === "image/gif" ||
+    file.type === "image/svg+xml"
+  ) {
     return file;
   }
 
   try {
     const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(
+      1,
+      maxDimension / Math.max(bitmap.width, bitmap.height),
+    );
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
@@ -30,7 +37,9 @@ const compressImage = async (file: File, maxDimension: number) => {
 
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/webp", 0.82),
+    );
 
     if (!blob || blob.size >= file.size) return file;
 
@@ -43,11 +52,7 @@ const compressImage = async (file: File, maxDimension: number) => {
   }
 };
 
-export const FileUpload = ({
-  onChange,
-  value,
-  endpoint,
-}: FileUploadProps) => {
+export const FileUpload = ({ onChange, value, endpoint }: FileUploadProps) => {
   // Check if a URL string exists (UploadThing URLs don't always end with explicit file extensions)
   const isImage = Boolean(value);
 
@@ -59,6 +64,7 @@ export const FileUpload = ({
             fill
             src={value}
             alt="Profile preview"
+            sizes="96px"
             className="rounded-full object-cover border-2 border-zinc-700 shadow-md"
           />
           <button
@@ -77,7 +83,13 @@ export const FileUpload = ({
   return (
     <UploadDropzone
       endpoint={endpoint}
-      onBeforeUploadBegin={(files) => Promise.all(files.map((file) => compressImage(file, endpoint === "ServerImage" ? 1024 : 1920)))}
+      onBeforeUploadBegin={(files) =>
+        Promise.all(
+          files.map((file) =>
+            compressImage(file, endpoint === "ServerImage" ? 1024 : 1920),
+          ),
+        )
+      }
       onClientUploadComplete={(res) => {
         onChange(res[0]?.url);
       }}
@@ -87,12 +99,10 @@ export const FileUpload = ({
       appearance={{
         container:
           "w-full h-36 border-2 border-dashed border-zinc-700 bg-zinc-800/40 hover:bg-zinc-800/70 rounded-xl flex flex-col items-center justify-center transition-colors cursor-pointer",
-        uploadIcon: 
-          "w-7 h-7 text-zinc-400 mb-1",
-        label: 
+        uploadIcon: "w-7 h-7 text-zinc-400 mb-1",
+        label:
           "text-xs font-medium text-zinc-300 hover:text-white transition-colors",
-        allowedContent: 
-          "text-[11px] text-zinc-500 font-normal mt-0.5",
+        allowedContent: "text-[11px] text-zinc-500 font-normal mt-0.5",
         button:
           "bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-4 py-2 rounded-lg transition-all ut-readying:bg-indigo-600/50 ut-uploading:bg-indigo-600/50 cursor-pointer",
       }}

@@ -1,6 +1,6 @@
 /**
  * Encrypted File Upload Component
- * 
+ *
  * Handles file encryption before upload to UploadThing.
  * Flow: File → Compress → Encrypt (AES-GCM) → Upload → Share key with recipients
  */
@@ -11,7 +11,7 @@ import { useState, useCallback } from "react";
 import { File, Lock, Unlock, Upload, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { encryptFile, decryptFile, generateFileKey } from "@/lib/e2ee/file-encryption";
+import { encryptFile } from "@/lib/e2ee/file-encryption";
 
 interface EncryptedFileUploadProps {
   channelId: string;
@@ -31,12 +31,17 @@ interface FileMetadata {
   compressed: boolean;
 }
 
-type UploadState = "idle" | "compressing" | "encrypting" | "uploading" | "complete" | "error";
+type UploadState =
+  | "idle"
+  | "compressing"
+  | "encrypting"
+  | "uploading"
+  | "complete"
+  | "error";
 
 export function EncryptedFileUpload({
   channelId,
   onUploadComplete,
-  recipients = [],
   accept = "*/*",
   maxSize = 100 * 1024 * 1024, // 100MB default
 }: EncryptedFileUploadProps) {
@@ -46,20 +51,29 @@ export function EncryptedFileUpload({
   const [error, setError] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<FileMetadata | null>(null);
 
-  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
-    if (file.size > maxSize) {
-      setError(`File too large. Maximum size is ${formatFileSize(maxSize)}`);
-      return;
-    }
+  const handleFileSelect = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
 
-    setSelectedFile(file);
-    setError(null);
-    setProgress(0);
-    setMetadata(null);
-  }, [maxSize]);
+      if (file.size > maxSize) {
+        setError(`File too large. Maximum size is ${formatFileSize(maxSize)}`);
+        return;
+      }
+
+      setSelectedFile(file);
+      setError(null);
+      setProgress(0);
+      setMetadata(null);
+    },
+    [maxSize],
+  );
 
   const handleUpload = useCallback(async () => {
     if (!selectedFile) return;
@@ -70,7 +84,7 @@ export function EncryptedFileUpload({
 
       // Encrypt the file
       const result = await encryptFile(selectedFile);
-      
+
       setUploadState("encrypting");
       setProgress(50);
 
@@ -93,7 +107,7 @@ export function EncryptedFileUpload({
       }
 
       const data = await response.json();
-      
+
       setMetadata(data.metadata);
       setProgress(100);
       setUploadState("complete");
@@ -115,12 +129,6 @@ export function EncryptedFileUpload({
     setUploadState("idle");
   }, []);
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
   return (
     <div className="rounded-xl border border-white/5 bg-[#2b2d31] p-4">
       {uploadState === "idle" && (
@@ -128,11 +136,12 @@ export function EncryptedFileUpload({
           <div className="mb-4 rounded-full bg-[#5865f2]/20 p-4">
             <Lock className="h-8 w-8 text-[#a5b4fc]" />
           </div>
-          
+
           <p className="mb-4 text-center text-sm text-[#949ba4]">
-            Files are encrypted before upload. Only members with access can decrypt.
+            Files are encrypted before upload. Only members with access can
+            decrypt.
           </p>
-          
+
           <label className="cursor-pointer">
             <input
               type="file"
@@ -154,7 +163,7 @@ export function EncryptedFileUpload({
             <div className="rounded-lg bg-[#383a40] p-2">
               <File className="h-5 w-5 text-[#b5bac1]" />
             </div>
-            
+
             <div className="flex-1 min-w-0">
               <p className="truncate text-sm font-medium text-white">
                 {selectedFile.name}
@@ -163,7 +172,7 @@ export function EncryptedFileUpload({
                 {formatFileSize(selectedFile.size)}
               </p>
             </div>
-            
+
             {uploadState === "complete" ? (
               <Check className="h-5 w-5 text-[#23a559]" />
             ) : uploadState === "error" ? (
@@ -187,9 +196,7 @@ export function EncryptedFileUpload({
             </div>
           )}
 
-          {error && (
-            <p className="text-sm text-[#f23f42]">{error}</p>
-          )}
+          {error && <p className="text-sm text-[#f23f42]">{error}</p>}
 
           {metadata && (
             <div className="rounded-lg bg-[#111214] p-3 text-xs">
@@ -246,7 +253,7 @@ export function EncryptedFileUpload({
 
 /**
  * Encrypted File Download Component
- * 
+ *
  * Decrypts and downloads files shared in chat.
  */
 
@@ -261,7 +268,9 @@ export function EncryptedFileDownload({
   metadata,
   fileName,
 }: EncryptedFileDownloadProps) {
-  const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "decrypting" | "complete" | "error">("idle");
+  const [downloadState, setDownloadState] = useState<
+    "idle" | "downloading" | "decrypting" | "complete" | "error"
+  >("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -273,7 +282,7 @@ export function EncryptedFileDownload({
       // Download encrypted file
       const response = await fetch(fileUrl);
       if (!response.ok) throw new Error("Download failed");
-      
+
       const encryptedBlob = await response.blob();
       setProgress(50);
 
@@ -283,13 +292,15 @@ export function EncryptedFileDownload({
       // For now, we'll show the structure
       const iv = new Uint8Array(12);
       const encryptedData = new Uint8Array(await encryptedBlob.arrayBuffer());
-      
+
       setProgress(80);
 
       // Create download
-      const decryptedBlob = new Blob([encryptedData], { type: metadata.mimeType });
+      const decryptedBlob = new Blob([encryptedData], {
+        type: metadata.mimeType,
+      });
       const url = URL.createObjectURL(decryptedBlob);
-      
+
       const a = document.createElement("a");
       a.href = url;
       a.download = fileName;
@@ -312,16 +323,14 @@ export function EncryptedFileDownload({
       <div className="rounded-lg bg-[#5865f2]/20 p-2">
         <Unlock className="h-5 w-5 text-[#a5b4fc]" />
       </div>
-      
+
       <div className="flex-1 min-w-0">
-        <p className="truncate text-sm font-medium text-white">
-          {fileName}
-        </p>
+        <p className="truncate text-sm font-medium text-white">{fileName}</p>
         <p className="text-xs text-[#949ba4]">
           {formatFileSize(metadata.encryptedSize)} · Encrypted
         </p>
       </div>
-      
+
       <Button
         onClick={handleDownload}
         disabled={downloadState !== "idle"}

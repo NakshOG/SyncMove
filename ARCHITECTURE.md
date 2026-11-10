@@ -64,19 +64,20 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 
 ### Why We Chose Each Technology
 
-| Technology | Purpose | Why We Chose It |
-|------------|---------|-----------------|
-| **Next.js 16** | Full-stack framework | App Router, server components, built-in API routes, excellent DX |
-| **React 19** | UI library | Concurrent features, better performance, hooks API |
-| **TypeScript** | Type safety | Catch errors at compile time, excellent IDE support |
-| **Clerk** | Authentication | Secure, easy OAuth, handles sessions, security best practices |
-| **Prisma + MariaDB** | ORM + Database | Type-safe queries, migrations, MySQL compatible |
-| **Socket.IO** | Real-time communication | Fallback to polling, rooms, events, auto-reconnect |
-| **WebRTC** | Video/Audio calls | Peer-to-peer, encrypted by default (DTLS-SRTP) |
-| **UploadThing** | File uploads | Simple API, works with S3, presigned URLs |
-| **Tailwind CSS** | Styling | Rapid UI development, consistent design system |
-| **Zustand** | State management | Simple, minimal boilerplate, works with React |
-| **Web Crypto API** | Encryption | Native browser API, secure, no external dependencies |
+| Technology           | Purpose                           | Why We Chose It                                                                   |
+| -------------------- | --------------------------------- | --------------------------------------------------------------------------------- |
+| **Next.js 16**       | Full-stack framework              | App Router, server components, built-in API routes, excellent DX                  |
+| **React 19**         | UI library                        | Concurrent features, better performance, hooks API                                |
+| **TypeScript**       | Type safety                       | Catch errors at compile time, excellent IDE support                               |
+| **Clerk**            | Authentication                    | Secure, easy OAuth, handles sessions, security best practices                     |
+| **Prisma + MariaDB** | ORM + Database                    | Type-safe queries, migrations, MySQL compatible                                   |
+| **Redis**            | Distributed realtime coordination | Shared pub/sub, shared socket adapter, presence coordination across app instances |
+| **Socket.IO**        | Real-time communication           | Fallback to polling, rooms, events, auto-reconnect, Redis adapter support         |
+| **WebRTC**           | Video/Audio calls                 | Peer-to-peer, encrypted by default (DTLS-SRTP)                                    |
+| **UploadThing**      | File uploads                      | Simple API, works with S3, presigned URLs                                         |
+| **Tailwind CSS**     | Styling                           | Rapid UI development, consistent design system                                    |
+| **Zustand**          | State management                  | Simple, minimal boilerplate, works with React                                     |
+| **Web Crypto API**   | Encryption                        | Native browser API, secure, no external dependencies                              |
 
 ---
 
@@ -107,11 +108,13 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 ```
 
 **Files**:
+
 - `lib/current-profile.ts` - Fetches user profile from Clerk
 - `app/(auth)/**` - Auth routes (sign-in, sign-up)
 - Middleware protects routes that require auth
 
 **Why Clerk?**
+
 - Handles security (password hashing, session management)
 - OAuth providers (Google, GitHub, etc.)
 - 2FA support
@@ -121,7 +124,7 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 
 ### Real-Time Messaging
 
-**Technology**: Socket.IO + EventEmitter + Prisma
+**Technology**: Socket.IO + Redis adapter + EventEmitter + Prisma
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -137,7 +140,7 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 │   Prisma creates message in MariaDB                              │
 │          │                                                       │
 │          ▼                                                       │
-│   EventEmitter publishes "channel-event"                         │
+│   Redis pub/sub or EventEmitter emits "channel-event"           │
 │          │                                                       │
 │          ▼                                                       │
 │   Socket.IO server broadcasts to channel:{channelId} room        │
@@ -152,16 +155,20 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 ```
 
 **Files**:
-- `pages/api/socket/io.ts` - Socket.IO server setup
-- `lib/realtime.ts` - EventEmitter for cross-API communication
+
+- `pages/api/socket/io.ts` - Socket.IO server setup and Redis adapter wiring
+- `lib/realtime.ts` - Redis-aware event fanout with in-memory fallback
+- `lib/redis.ts` - Redis client lifecycle management
 - `app/api/messages/route.ts` - Message CRUD
 - `components/providers/socket-provider.tsx` - Client socket connection
 - `components/chat/chat-messages.tsx` - Message display
 
 **Why This Architecture?**
+
 1. **REST for persistence** - Messages stored in database, searchable
 2. **WebSocket for real-time** - Instant delivery, presence
-3. **EventEmitter for decoupling** - API routes can trigger socket events
+3. **Redis pub/sub** - Shared fanout across multiple app instances
+4. **EventEmitter fallback** - Keeps local development simple when Redis is absent
 
 **Socket Events**:
 | Event | Direction | Purpose |
@@ -169,6 +176,7 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 | `join-channel` | Client → Server | Join a channel room |
 | `message-event` | Server → Client | New/updated/deleted message |
 | `server-presence` | Server → Client | Online members |
+| `call-presence` | Server → Client | Active call participants |
 
 ---
 
@@ -211,16 +219,18 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 ```
 
 **Files**:
+
 - `components/chat/call-room.tsx` - WebRTC logic
 - `pages/api/socket/io.ts` - Call signaling
 
 **WebRTC Security**:
+
 ```typescript
 // DTLS-SRTP is ENFORCED
 const pc = new RTCPeerConnection({
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-  bundlePolicy: "max-bundle",      // Bundles all streams over one DTLS connection
-  rtcpMuxPolicy: "require",        // Requires RTCP multiplexing
+  bundlePolicy: "max-bundle", // Bundles all streams over one DTLS connection
+  rtcpMuxPolicy: "require", // Requires RTCP multiplexing
   // certificates generated automatically with ECDSA
 });
 
@@ -228,10 +238,12 @@ const pc = new RTCPeerConnection({
 ```
 
 **ICE Servers**:
+
 - **STUN** (stun.l.google.com:19302) - NAT traversal helper
 - **TURN** (you add) - Relay server for when P2P fails
 
 **Why WebRTC?**
+
 - Built into browsers (no plugins)
 - Encrypts media by default (DTLS-SRTP)
 - Efficient (direct P2P, no server bandwidth)
@@ -291,21 +303,25 @@ const pc = new RTCPeerConnection({
 #### Key Technologies
 
 **1. X3DH (Extended Triple Diffie-Hellman)**
+
 - Asynchronous key exchange (Bob doesn't need to be online)
 - Uses Identity Keys, Signed Pre-Keys, One-Time Pre-Keys
 - Establishes shared secret
 
 **2. Double Ratchet Algorithm**
+
 - Derives new keys for each message
 - **Forward Secrecy** - past messages safe if key compromised
 - **Post-Compromise Security** - sessions auto-heal
 
 **3. AES-GCM**
+
 - Authenticated encryption (integrity + confidentiality)
 - 256-bit keys
 - Used for message encryption
 
 **Files**:
+
 - `lib/e2ee/x3dh.ts` - X3DH key exchange
 - `lib/e2ee/double-ratchet.ts` - Per-message encryption
 - `lib/e2ee/key-storage.ts` - IndexedDB storage (keys never leave device)
@@ -315,6 +331,7 @@ const pc = new RTCPeerConnection({
 - `app/api/keys/` - Key bundle API
 
 **Why This Implementation?**
+
 - **Signal Protocol** - Proven, audited, used by WhatsApp/Signal
 - **Web Crypto API** - Native browser crypto, no external dependencies
 - **IndexedDB** - Private keys stored securely on device
@@ -357,11 +374,13 @@ const pc = new RTCPeerConnection({
 ```
 
 **Files**:
+
 - `lib/uploadthing.ts` - UploadThing configuration
 - `app/api/uploadthing/` - UploadThing API routes
 - `components/ui/file-upload.tsx` - Upload UI component
 
 **Why UploadThing?**
+
 - Simple API
 - Handles S3 complexity
 - Presigned URLs (direct upload, no server bottleneck)
@@ -508,7 +527,7 @@ model Profile {
   name     String
   imageUrl String @db.Text
   email    String @db.Text
-  
+
   servers  Server[]
   members  Member[]
   channels Channel[]
@@ -522,12 +541,12 @@ model Server {
   name       String
   imageURL   String @db.Text
   inviteCode String @unique
-  
+
   members    Member[]
   channels   Channel[]
   CreatedAt  DateTime @default(now())
   UpdatedAt  DateTime @updatedAt
-  
+
   profileId String
   profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 }
@@ -536,17 +555,17 @@ model Server {
 model Member {
   id   String     @id @default(uuid())
   role MemberRole @default(GUEST)  // ADMIN, MODERATOR, GUEST
-  
+
   serverId String
   server   Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  
+
   profileId String
   profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  
+
   messages Message[]
   CreatedAt DateTime @default(now())
   UpdatedAt DateTime @updatedAt
-  
+
   @@unique([profileId, serverId])  // One membership per user per server
 }
 
@@ -555,13 +574,13 @@ model Channel {
   id   String      @id @default(uuid())
   name String
   type ChannelType @default(TEXT)
-  
+
   serverId String
   server   Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  
+
   profileId String
   profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  
+
   messages Message[]
   CreatedAt DateTime @default(now())
   UpdatedAt DateTime @updatedAt
@@ -586,16 +605,16 @@ model Message {
 model KeyBundle {
   id            String   @id @default(uuid())
   userId        String   @unique
-  
+
   // Public key components (never private keys!)
   identityKey   String   @db.Text   // X25519 public key
   signedPreKey  String   @db.Text   // X25519 public key
   signature     String   @db.Text   // Ed25519 signature of SPK
-  
+
   // One-time pre-key (null when exhausted)
   oneTimePreKeyId String?
   oneTimePreKey   String? @db.Text
-  
+
   created       DateTime @default(now())
   updated       DateTime @updatedAt
 }
@@ -641,13 +660,13 @@ model KeyBundle {
 
 ### What We Protect
 
-| Asset | Protection |
-|-------|------------|
+| Asset               | Protection                                  |
+| ------------------- | ------------------------------------------- |
 | **Message content** | E2EE (Signal Protocol) - Server cannot read |
-| **Media streams** | DTLS-SRTP - Encrypted P2P |
-| **Private keys** | IndexedDB only - Never transmitted |
-| **User passwords** | Clerk handles - We never see them |
-| **File content** | Encrypt before upload (future) |
+| **Media streams**   | DTLS-SRTP - Encrypted P2P                   |
+| **Private keys**    | IndexedDB only - Never transmitted          |
+| **User passwords**  | Clerk handles - We never see them           |
+| **File content**    | Encrypt before upload (future)              |
 
 ### Threat Model
 
@@ -729,13 +748,13 @@ model KeyBundle {
 
 ### Scaling Considerations
 
-| Component | Scaling Strategy |
-|-----------|-----------------|
-| **Next.js** | Serverless (Vercel) - auto-scales |
-| **MariaDB** | Managed DB (Planetscale/Railway) |
-| **Socket.IO** | Horizontal scaling with Redis adapter (for multiple instances) |
-| **TURN Server** | Add more instances behind load balancer for call capacity |
-| **UploadThing** | S3 handles storage, CDN for delivery |
+| Component       | Scaling Strategy                                               |
+| --------------- | -------------------------------------------------------------- |
+| **Next.js**     | Serverless (Vercel) - auto-scales                              |
+| **MariaDB**     | Managed DB (Planetscale/Railway)                               |
+| **Socket.IO**   | Horizontal scaling with Redis adapter (for multiple instances) |
+| **TURN Server** | Add more instances behind load balancer for call capacity      |
+| **UploadThing** | S3 handles storage, CDN for delivery                           |
 
 ### Environment Variables
 
@@ -860,14 +879,14 @@ npm run dev
 
 ### Key Files to Understand
 
-| File | Purpose |
-|------|---------|
-| `pages/api/socket/io.ts` | Socket.IO server, real-time events |
-| `lib/e2ee/x3dh.ts` | Key exchange implementation |
-| `lib/e2ee/double-ratchet.ts` | Message encryption |
-| `prisma/schema.prisma` | Database schema |
-| `components/chat/call-room.tsx` | WebRTC video calls |
-| `docker-compose.yml` | Application container deployment |
+| File                            | Purpose                            |
+| ------------------------------- | ---------------------------------- |
+| `pages/api/socket/io.ts`        | Socket.IO server, real-time events |
+| `lib/e2ee/x3dh.ts`              | Key exchange implementation        |
+| `lib/e2ee/double-ratchet.ts`    | Message encryption                 |
+| `prisma/schema.prisma`          | Database schema                    |
+| `components/chat/call-room.tsx` | WebRTC video calls                 |
+| `docker-compose.yml`            | Application container deployment   |
 
 ---
 
@@ -888,11 +907,11 @@ docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
 
 ### Services Included
 
-| Service | Image | Port | Purpose |
-|---------|-------|------|---------|
-| app | Next.js custom | 3000 | Web application |
-| db | MariaDB 10.11 | 3306 | Database |
-| coturn | coturn/coturn | 3478 | TURN server (optional) |
+| Service | Image          | Port | Purpose                |
+| ------- | -------------- | ---- | ---------------------- |
+| app     | Next.js custom | 3000 | Web application        |
+| db      | MariaDB 10.11  | 3306 | Database               |
+| coturn  | coturn/coturn  | 3478 | TURN server (optional) |
 
 ### Architecture Diagram
 
@@ -912,6 +931,7 @@ docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
 ### Environment Variables
 
 Required in `.env`:
+
 - `DATABASE_URL` - MySQL connection string
 - `CLERK_*` - Clerk authentication
 - `UPLOADTHING_*` - File storage credentials
@@ -928,15 +948,15 @@ Required in `.env`:
 
 ## Future Improvements
 
-| Priority | Feature | Description |
-|----------|---------|-------------|
-| High | Thread Support | Nested message threads |
-| High | Reactions | Emoji reactions to messages |
-| Medium | Push Notifications | Web Push API for offline messages |
-| Medium | Message Search | Full-text encrypted search |
-| Low | Voice Messages | Audio message recording |
-| Low | Screen Sharing | Share screen in video calls |
+| Priority | Feature            | Description                       |
+| -------- | ------------------ | --------------------------------- |
+| High     | Thread Support     | Nested message threads            |
+| High     | Reactions          | Emoji reactions to messages       |
+| Medium   | Push Notifications | Web Push API for offline messages |
+| Medium   | Message Search     | Full-text encrypted search        |
+| Low      | Voice Messages     | Audio message recording           |
+| Low      | Screen Sharing     | Share screen in video calls       |
 
 ---
 
-*Document generated: November 2026*
+_Document generated: November 2026_

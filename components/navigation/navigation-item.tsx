@@ -14,14 +14,10 @@ interface NavigationItemProps {
   name: string;
 }
 
-export const NavigationItem = ({
-  id,
-  imageUrl,
-  name,
-}: NavigationItemProps) => {
+export const NavigationItem = ({ id, imageUrl, name }: NavigationItemProps) => {
   const params = useParams();
   const router = useRouter();
-  
+
   return (
     <ActionTooltip side="right" align="center" label={name}>
       <div
@@ -32,19 +28,20 @@ export const NavigationItem = ({
           className={cn(
             "absolute left-0 rounded-r-full bg-[#5865f2] transition-all w-[4px]",
             params?.serverID !== id && "group-hover:h-[20px]",
-            params?.serverID === id ? "h-[36px]" : "h-[8px]"
+            params?.serverID === id ? "h-[36px]" : "h-[8px]",
           )}
         />
 
         <div
           className={cn(
-            "relative mx-3 flex h-12 w-12 overflow-hidden rounded-xl bg-[#313338] transition-all group-hover:rounded-xl"
+            "relative mx-3 flex h-12 w-12 overflow-hidden rounded-xl bg-[#313338] transition-all group-hover:rounded-xl",
           )}
         >
           <Image
             fill
             src={imageUrl}
             alt={name}
+            sizes="48px"
             className="object-cover"
           />
         </div>

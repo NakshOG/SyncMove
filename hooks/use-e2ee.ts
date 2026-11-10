@@ -67,30 +67,20 @@ export function useE2EE(): UseE2EEReturn {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Check if we already have keys in IndexedDB
       const storedIdentity = await keyStorage.getKey("identity");
-      
-      if (storedIdentity) {
-        // Keys exist, load them
-        const ikData = await keyStorage.getKey("identity");
-        const spkData = await keyStorage.getKey("signed-pre-key");
-        
-        if (ikData && spkData) {
-          // Export to raw for reference (don't need to re-import)
-          identityKeyRef.current = {
-            publicKey: new Uint8Array(32), // Placeholder
-            privateKey: new Uint8Array(32), // Placeholder
-          };
-          signedPreKeyRef.current = {
-            keyId: "loaded",
-            publicKey: new Uint8Array(32),
-            privateKey: new Uint8Array(32),
-            signature: new Uint8Array(64),
-          };
-          
-          // Initialize session manager
+      const storedSignedPreKey = await keyStorage.getKey("signed-pre-key");
+
+      if (storedIdentity && storedSignedPreKey) {
+        const identity = storedIdentity as IdentityKeyPair;
+        const signedPreKey = storedSignedPreKey as SignedPreKeyPair;
+
+        if (identity.publicKey && identity.privateKey && signedPreKey.publicKey && signedPreKey.privateKey) {
+          identityKeyRef.current = identity;
+          signedPreKeyRef.current = signedPreKey;
+          oneTimePreKeysRef.current = (await generateOneTimePreKeys(100)) ?? [];
+
           await sessionManager.initialize(identityKeyRef.current, "local");
-          
+
           setState({
             initialized: true,
             hasKeyBundle: true,
@@ -101,22 +91,18 @@ export function useE2EE(): UseE2EEReturn {
         }
       }
 
-      // Generate new keys
       const identityKey = await generateKeyPair();
       const signedPreKey = await generateSignedPreKey(identityKey);
       const oneTimePreKeys = await generateOneTimePreKeys(100);
-
-      // Store private keys locally (never on server)
-      await keyStorage.storeKey("identity", identityKey);
-      await keyStorage.storeKey("signed-pre-key", signedPreKey);
-      await keyStorage.storeKey("one-time-pre-keys", await crypto.subtle.exportKey("jwk", await generateOneTimePreKeys(1)[0].then(k => k as any).catch(() => null as any) as any));
 
       identityKeyRef.current = identityKey;
       signedPreKeyRef.current = signedPreKey;
       oneTimePreKeysRef.current = oneTimePreKeys;
 
-      // Initialize session manager
-      await sessionManager.initialize(identityKey, profile?.id ?? "local");
+      await keyStorage.storeKey("identity", identityKey);
+      await keyStorage.storeKey("signed-pre-key", signedPreKey);
+
+      await sessionManager.initialize(identityKey, "local");
 
       setState({
         initialized: true,
@@ -282,18 +268,20 @@ export function useE2EE(): UseE2EEReturn {
         const keys = [
           { id: "identity", key: identityKeyRef.current },
           { id: "signed-pre-key", key: signedPreKeyRef.current },
-        ].filter((k): k is { id: string; key: CryptoKey } => k.key !== null);
+        ].filter((k): k is { id: string; key: IdentityKeyPair | SignedPreKeyPair } => k.key !== null);
 
         if (keys.length === 0) return null;
 
-        // Convert to exportable format
-        const exportableKeys = await Promise.all(
-          keys.map(async (k) => ({
-            id: k.id,
-            key: await crypto.subtle.exportKey("raw", k.key),
-            type: "X25519",
-          }))
-        );
+        const exportableKeys = keys.map((k) => ({
+          id: k.id,
+          key: {
+            publicKey: Array.from(k.key.publicKey),
+            privateKey: Array.from(k.key.privateKey),
+            signingPublicKey: "signingPublicKey" in k.key ? Array.from(k.key.signingPublicKey ?? []) : undefined,
+            signingPrivateKey: "signingPrivateKey" in k.key ? Array.from(k.key.signingPrivateKey ?? []) : undefined,
+          },
+          type: "X25519",
+        }));
 
         // Encrypt with password
         const passwordEncoder = new TextEncoder();
@@ -386,16 +374,16 @@ export function useE2EE(): UseE2EEReturn {
 
         const keys = JSON.parse(new TextDecoder().decode(decrypted));
 
-        // Import and store keys
         for (const keyData of keys) {
-          const key = await crypto.subtle.importKey(
-            "raw",
-            new Uint8Array(keyData.key),
-            { name: "ECDH", namedCurve: "X25519" },
-            true,
-            ["deriveBits", "deriveKey"]
-          );
-          await keyStorage.storeKey(keyData.id, key);
+          const rawKey = keyData.key as { publicKey?: number[]; privateKey?: number[]; signingPublicKey?: number[]; signingPrivateKey?: number[] };
+          if (!rawKey || !rawKey.publicKey || !rawKey.privateKey) continue;
+
+          await keyStorage.storeKey(keyData.id, {
+            publicKey: new Uint8Array(rawKey.publicKey),
+            privateKey: new Uint8Array(rawKey.privateKey),
+            signingPublicKey: rawKey.signingPublicKey ? new Uint8Array(rawKey.signingPublicKey) : undefined,
+            signingPrivateKey: rawKey.signingPrivateKey ? new Uint8Array(rawKey.signingPrivateKey) : undefined,
+          });
         }
 
         await initializeE2EE();
@@ -408,9 +396,20 @@ export function useE2EE(): UseE2EEReturn {
     [initializeE2EE]
   );
 
-  // Auto-initialize on mount
+  // Auto-initialize on mount without synchronously calling setState inside the effect body.
   useEffect(() => {
-    initializeE2EE();
+    let active = true;
+
+    const run = async () => {
+      if (!active) return;
+      await initializeE2EE();
+    };
+
+    void run();
+
+    return () => {
+      active = false;
+    };
   }, [initializeE2EE]);
 
   return {

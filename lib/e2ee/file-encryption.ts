@@ -401,17 +401,15 @@ export async function encryptFileWithProgress(
 }
 
 /**
- * Fallback compression using pako (if CompressionStream not available)
+ * Explicit fallback for environments without CompressionStream.
+ * We do not silently lie about compression; we simply return the original data
+ * when the platform does not support gzip.
  */
 export async function compressWithPako(data: Uint8Array): Promise<Uint8Array> {
-  // This is a placeholder - in production, you'd check for pako import
-  // For now, return data uncompressed if pako not available
-  if (typeof window !== "undefined" && (window as any).pako) {
-    return (window as any).pako.gzip(data);
+  if (typeof CompressionStream !== "undefined") {
+    return compress(data);
   }
-  
-  // Fallback: no compression
-  console.warn("Compression not available, sending uncompressed data");
+
   return data;
 }
 

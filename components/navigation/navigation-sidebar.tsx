@@ -1,4 +1,3 @@
-"use client";
 
 import { currentProfile } from "@/lib/current-profile";
 import { redirect } from "next/navigation";
@@ -35,15 +34,15 @@ export const NavigationSidebar = async () => {
       <NavigationAction />
 
       <ActionTooltip label="Direct messages" side="right" align="center">
-        <Link 
-          href="/conversations" 
-          aria-label="Direct messages" 
+        <Link
+          href="/conversations"
+          aria-label="Direct messages"
           className="group relative flex h-12 w-12 items-center justify-center rounded-xl bg-[#313338] text-[#b5bac1] transition-all hover:bg-[#5865f2] hover:text-white"
         >
           <MessageCircle className="h-5 w-5" />
         </Link>
       </ActionTooltip>
-      
+
       <DiscoverAction />
 
       <Separator className="mx-auto h-px !w-3/4 bg-[#35373c]" />

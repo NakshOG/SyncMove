@@ -60,11 +60,12 @@ export async function POST(req: Request) {
   if (!member) return new NextResponse("Member not found", { status: 404 });
 
   const message = await db.message.create({
-    data: { 
-      content: content || "Attachment", 
-      fileUrl, 
-      channelId, 
+    data: {
+      content: content || "Attachment",
+      fileUrl,
+      channelId,
       memberId: member.id,
+      encrypted: isEncrypted,
     },
     include: { member: { include: { profile: true } } },
   });

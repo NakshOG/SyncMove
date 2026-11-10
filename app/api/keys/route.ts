@@ -29,7 +29,7 @@ const keyBundleSchema = z.object({
  * GET /api/keys
  * Upload or update own key bundle
  */
-export async function POST(req: Request) {
+export async function POST(_req: Request) {
   try {
     const profile = await currentProfile();
     if (!profile) {
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
  * GET /api/keys
  * Get own key bundle (for backup/export purposes)
  */
-export async function GET(req: Request) {
+export async function GET(_req: Request) {
   try {
     const profile = await currentProfile();
     if (!profile) {
@@ -115,7 +115,7 @@ export async function GET(req: Request) {
  * DELETE /api/keys
  * Delete own key bundle (e.g., after compromise or device reset)
  */
-export async function DELETE(req: Request) {
+export async function DELETE(_req: Request) {
   try {
     const profile = await currentProfile();
     if (!profile) {

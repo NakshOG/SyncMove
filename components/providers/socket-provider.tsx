@@ -1,33 +1,52 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
+import { useAuth } from "@clerk/nextjs";
 import { io, Socket } from "socket.io-client";
 
-type SocketContextValue = { 
-  socket: Socket | null; 
+type SocketContextValue = {
+  socket: Socket | null;
   isConnected: boolean;
   isAuthenticated: boolean;
   reconnecting: boolean;
 };
 
-const SocketContext = createContext<SocketContextValue>({ 
-  socket: null, 
+const SocketContext = createContext<SocketContextValue>({
+  socket: null,
   isConnected: false,
   isAuthenticated: false,
   reconnecting: false,
 });
 
 export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     let disposed = false;
-    let instance: Socket | null = null;
     let bootstrapInFlight: Promise<void> | null = null;
     let pingInterval: NodeJS.Timeout | null = null;
+
+    const clearSocket = () => {
+      const current = socketRef.current;
+      if (!current) return;
+
+      current.removeAllListeners();
+      current.disconnect();
+      socketRef.current = null;
+      setSocket(null);
+    };
 
     const bootstrap = async () => {
       for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -58,8 +77,19 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (disposed) return;
 
-      instance = io(window.location.origin, {
-        path: "/socket.io",
+      if (!isLoaded || !isSignedIn) {
+        clearSocket();
+        setIsConnected(false);
+        setIsAuthenticated(false);
+        return;
+      }
+
+      const sessionToken = (await getToken()) ?? "";
+
+      clearSocket();
+
+      const instance = io(window.location.origin, {
+        path: "/api/socket/io",
         addTrailingSlash: false,
         autoConnect: false,
         transports: ["polling", "websocket"],
@@ -69,35 +99,38 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         timeout: 10000,
-        // Auth token will be sent via handshake headers
-        auth: (cb) => {
-          // Get Clerk session token
-          const cookies = document.cookie;
-          const match = cookies.match(/__session=([^;]+)/);
-          const token = match ? match[1] : "";
-          cb({ token });
-        },
+        withCredentials: true,
+        extraHeaders: sessionToken
+          ? {
+              Authorization: `Bearer ${sessionToken}`,
+            }
+          : undefined,
+        auth: sessionToken
+          ? {
+              token: sessionToken,
+            }
+          : undefined,
       });
 
-      // Connection state
+      socketRef.current = instance;
+
       instance.on("connect", () => {
-        console.log("[socket] Connected:", instance?.id);
+        console.log("[socket] Connected:", instance.id);
         setIsConnected(true);
         setReconnecting(false);
-        
-        // Start heartbeat
+
         pingInterval = setInterval(() => {
-          if (instance?.connected) {
+          if (instance.connected) {
             instance.emit("ping");
           }
         }, 30000);
       });
 
       instance.on("disconnect", (reason) => {
-        console.log("[socket] Disconnected:", instance?.id, reason);
+        console.log("[socket] Disconnected:", instance.id, reason);
         setIsConnected(false);
         setIsAuthenticated(false);
-        
+
         if (pingInterval) {
           clearInterval(pingInterval);
           pingInterval = null;
@@ -107,8 +140,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       instance.on("connect_error", (error) => {
         console.warn("[socket] Connection error:", error.message);
         setIsConnected(false);
-        
-        // Retry bootstrap on connection error
+
         if (!disposed) {
           void ensureBootstrap().then(() => {
             if (!disposed && instance && !instance.disconnected) {
@@ -128,33 +160,33 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         console.log("[socket] Reconnected");
       });
 
-      // Authentication state
-      instance.on("authenticated", ({ userId, socketId }: { userId: string; socketId: string }) => {
-        console.log("[socket] Authenticated as:", userId);
-        setIsAuthenticated(true);
-      });
+      instance.on(
+        "authenticated",
+        ({ userId }: { userId: string; socketId: string }) => {
+          console.log("[socket] Authenticated as:", userId);
+          setIsAuthenticated(true);
+        },
+      );
 
       instance.on("auth_error", ({ message }: { message: string }) => {
         console.warn("[socket] Auth error:", message);
         setIsAuthenticated(false);
       });
 
-      // Heartbeat response
       instance.on("pong", ({ timestamp }: { timestamp: number }) => {
         const latency = Date.now() - timestamp;
         console.log(`[socket] Pong - latency: ${latency}ms`);
       });
 
-      // Rate limit feedback
-      instance.on("rate_limit", ({ message, retryAfter }: { message: string; retryAfter: number }) => {
-        console.warn("[socket] Rate limited:", message);
-        // Could show toast notification
-      });
+      instance.on(
+        "rate_limit",
+        ({ message }: { message: string; retryAfter: number }) => {
+          console.warn("[socket] Rate limited:", message);
+        },
+      );
 
-      // Flood detection
       instance.on("flood_detected", ({ message }: { message: string }) => {
         console.warn("[socket] Flood detected:", message);
-        // Could show toast notification
       });
 
       setSocket(instance);
@@ -168,22 +200,20 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       setIsConnected(false);
       setIsAuthenticated(false);
       setReconnecting(false);
-      
+
       if (pingInterval) {
         clearInterval(pingInterval);
       }
-      
-      instance?.removeAllListeners();
-      instance?.disconnect();
-      instance = null;
+
+      clearSocket();
     };
-  }, []);
+  }, [getToken, isLoaded, isSignedIn]);
 
   return (
-    <SocketContext.Provider 
-      value={{ 
-        socket, 
-        isConnected, 
+    <SocketContext.Provider
+      value={{
+        socket,
+        isConnected,
         isAuthenticated,
         reconnecting,
       }}
@@ -200,7 +230,7 @@ export const useSocket = () => useContext(SocketContext);
  */
 export function useSocketStatus() {
   const { socket, isConnected, isAuthenticated, reconnecting } = useSocket();
-  
+
   const reconnect = useCallback(() => {
     if (socket && !isConnected) {
       socket.connect();

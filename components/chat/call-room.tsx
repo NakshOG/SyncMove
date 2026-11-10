@@ -186,7 +186,9 @@ export const CallRoom = ({
 
   const peers = useRef(new Map<string, RTCPeerConnection>());
   const pendingCandidates = useRef(new Map<string, RTCIceCandidateInit[]>());
-  const peerConnectionsRef = useRef(new Map<string, { offerSent: boolean; remoteDescriptionSet: boolean }>());
+  const peerConnectionsRef = useRef(
+    new Map<string, { offerSent: boolean; remoteDescriptionSet: boolean }>(),
+  );
 
   const [active, setActive] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -196,7 +198,9 @@ export const CallRoom = ({
   const [duration, setDuration] = useState(0);
   const [present, setPresent] = useState<Participant[]>([]);
   const [encrypted, setEncrypted] = useState(false);
-  const [connectionQuality, setConnectionQuality] = useState<"excellent" | "good" | "fair" | "poor">("good");
+  const [connectionQuality, setConnectionQuality] = useState<
+    "excellent" | "good" | "fair" | "poor"
+  >("good");
 
   const presentRef = useRef<Participant[]>([]);
 
@@ -222,31 +226,42 @@ export const CallRoom = ({
     setPresent(next);
   }, []);
 
-  const getConnectionQuality = useCallback((pc: RTCPeerConnection): "excellent" | "good" | "fair" | "poor" => {
-    try {
-      const stats = pc.getStats();
-      let packetLoss = 0;
-      let jitter = 0;
-      let roundTripTime = 0;
+  const getConnectionQuality = useCallback(
+    (pc: RTCPeerConnection): "excellent" | "good" | "fair" | "poor" => {
+      try {
+        const stats = pc.getStats();
+        let packetLoss = 0;
+        let jitter = 0;
+        let roundTripTime = 0;
 
-      stats.forEach((report) => {
-        if (report.type === "inbound-rtp" && report.kind === "video") {
-          packetLoss = report.packetsLost / (report.packetsReceived + report.packetsLost) * 100;
-          jitter = report.jitter;
-        }
-        if (report.type === "candidate-pair" && report.state === "succeeded") {
-          roundTripTime = report.currentRoundTripTime * 1000;
-        }
-      });
+        stats.forEach((report) => {
+          if (report.type === "inbound-rtp" && report.kind === "video") {
+            packetLoss =
+              (report.packetsLost /
+                (report.packetsReceived + report.packetsLost)) *
+              100;
+            jitter = report.jitter;
+          }
+          if (
+            report.type === "candidate-pair" &&
+            report.state === "succeeded"
+          ) {
+            roundTripTime = report.currentRoundTripTime * 1000;
+          }
+        });
 
-      if (packetLoss < 0.5 && jitter < 30 && roundTripTime < 100) return "excellent";
-      if (packetLoss < 1 && jitter < 50 && roundTripTime < 200) return "good";
-      if (packetLoss < 3 && jitter < 100 && roundTripTime < 400) return "fair";
-      return "poor";
-    } catch {
-      return "good";
-    }
-  }, []);
+        if (packetLoss < 0.5 && jitter < 30 && roundTripTime < 100)
+          return "excellent";
+        if (packetLoss < 1 && jitter < 50 && roundTripTime < 200) return "good";
+        if (packetLoss < 3 && jitter < 100 && roundTripTime < 400)
+          return "fair";
+        return "poor";
+      } catch {
+        return "good";
+      }
+    },
+    [],
+  );
 
   const updateConnectionQuality = useCallback(() => {
     peers.current.forEach((pc) => {
@@ -270,9 +285,7 @@ export const CallRoom = ({
     peerConnectionsRef.current.delete(socketId);
 
     setRemoteStreams((current) =>
-      current.filter(
-        (item) => item.participant.socketId !== socketId,
-      ),
+      current.filter((item) => item.participant.socketId !== socketId),
     );
 
     setPresent((current) =>
@@ -360,8 +373,7 @@ export const CallRoom = ({
 
         setRemoteStreams((current) => {
           const existingIndex = current.findIndex(
-            (item) =>
-              item.participant.socketId === participant.socketId,
+            (item) => item.participant.socketId === participant.socketId,
           );
 
           if (existingIndex !== -1) {
@@ -379,7 +391,9 @@ export const CallRoom = ({
           .createOffer()
           .then((description) =>
             connection.setLocalDescription(description).then(() => {
-              const peerData = peerConnectionsRef.current.get(participant.socketId);
+              const peerData = peerConnectionsRef.current.get(
+                participant.socketId,
+              );
               if (peerData) peerData.offerSent = true;
               sendSignal(participant.socketId, {
                 kind: "offer",
@@ -481,8 +495,7 @@ export const CallRoom = ({
 
         const level = Math.sqrt(
           samples.reduce(
-            (sum, sample) =>
-              sum + ((sample - 128) / 128) ** 2,
+            (sum, sample) => sum + ((sample - 128) / 128) ** 2,
             0,
           ) / samples.length,
         );
@@ -721,17 +734,9 @@ export const CallRoom = ({
     setCamera(track.enabled);
   };
 
-  const visible = present.slice(0, MAX_VISIBLE_AVATARS);
-
   const durationText = `${Math.floor(duration / 60)
     .toString()
-    .padStart(2, "0")}:${(duration % 60)
-    .toString()
-    .padStart(2, "0")}`;
-
-  const stageMembers = present.length
-    ? present
-    : [normalizeParticipant({ ...self, socketId: `local:${self.id}` })];
+    .padStart(2, "0")}:${(duration % 60).toString().padStart(2, "0")}`;
 
   const qualityColor =
     connectionQuality === "excellent"
@@ -756,9 +761,7 @@ export const CallRoom = ({
               {video ? "Video call" : "Voice call"}
             </h2>
             <p className="text-xs text-[#949ba4]">
-              {active
-                ? `Connected · ${durationText}`
-                : "Ready to connect"}
+              {active ? `Connected · ${durationText}` : "Ready to connect"}
             </p>
           </div>
         </div>
@@ -776,10 +779,7 @@ export const CallRoom = ({
 
           {/* Connection quality */}
           <span className="flex items-center gap-1.5">
-            <Wifi
-              className="h-4 w-4"
-              style={{ color: qualityColor }}
-            />
+            <Wifi className="h-4 w-4" style={{ color: qualityColor }} />
             {connectionQuality}
           </span>
 
@@ -844,36 +844,44 @@ export const CallRoom = ({
             }`}
           >
             {/* Local video */}
-            <div className="relative overflow-hidden rounded-xl border border-white/5 bg-[#111214]">
-              <video
-                ref={localVideo}
-                autoPlay
-                muted
-                playsInline
-                style={{
-                  transform: video ? "scaleX(-1)" : undefined,
-                }}
-                className={`${
-                  video ? "aspect-video" : "h-24"
-                } w-full object-cover ${!video ? "opacity-0" : ""}`}
-              />
-
-              {!video && (
-                <Image
-                  src={currentParticipant.imageUrl}
-                  alt={currentParticipant.name}
-                  width={80}
-                  height={80}
-                  unoptimized
-                  className="absolute inset-0 m-auto h-20 w-20 rounded-full ring-4 ring-[#5865f2]/30"
+            {active ? (
+              <div className="relative overflow-hidden rounded-xl border border-white/5 bg-[#111214]">
+                <video
+                  ref={localVideo}
+                  autoPlay
+                  muted
+                  playsInline
+                  style={{
+                    transform: video ? "scaleX(-1)" : undefined,
+                  }}
+                  className={`${
+                    video ? "aspect-video" : "h-24"
+                  } w-full object-cover ${!video ? "opacity-0" : ""}`}
                 />
-              )}
 
-              <span className="absolute bottom-3 left-3 rounded-full bg-black/60 px-3 py-1.5 text-xs">
-                {currentParticipant.name} (You)
-                {muted ? " · muted" : ""}
-              </span>
-            </div>
+                {!video && (
+                  <Image
+                    src={currentParticipant.imageUrl}
+                    alt={currentParticipant.name}
+                    width={80}
+                    height={80}
+                    unoptimized
+                    className="absolute inset-0 m-auto h-20 w-20 rounded-full ring-4 ring-[#5865f2]/30"
+                  />
+                )}
+
+                <span className="absolute bottom-3 left-3 rounded-full bg-black/60 px-3 py-1.5 text-xs">
+                  {currentParticipant.name} (You)
+                  {muted ? " · muted" : ""}
+                </span>
+              </div>
+            ) : (
+              <div className="flex min-h-32 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#404249] bg-[#111214]">
+                <p className="text-sm text-[#949ba4]">
+                  You are not in this call.
+                </p>
+              </div>
+            )}
 
             {/* Remote streams */}
             {remoteStreams.map((item) => (
@@ -887,7 +895,9 @@ export const CallRoom = ({
             {/* Waiting / Empty state */}
             {active && remoteStreams.length === 0 && (
               <div className="flex min-h-32 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#404249]">
-                <p className="text-sm text-[#949ba4]">Waiting for others to join...</p>
+                <p className="text-sm text-[#949ba4]">
+                  Waiting for others to join...
+                </p>
                 {remoteParticipants.length > 0 && (
                   <div className="flex -space-x-3">
                     {remoteParticipants.map((member) => (
