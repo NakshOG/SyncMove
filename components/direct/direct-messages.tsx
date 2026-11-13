@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useSocket } from "@/components/providers/socket-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MessageCircle, Search, Video, Lock } from "lucide-react";
+import { MessageCircle, Search, Lock, Video } from "lucide-react";
 import { DMSearch } from "./dm-search";
 import { DMListSkeleton } from "./dm-list-skeleton";
 import { E2EEBadge } from "./e2ee-badge";
@@ -33,6 +33,7 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isVideoCall, setIsVideoCall] = useState(false);
   const { socket, isConnected } = useSocket();
   const searchParams = useSearchParams();
 
@@ -93,6 +94,14 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
     setContent("");
     const response = await fetch(`/api/conversations/${selected}/messages`);
     setMessages(await response.json());
+  };
+
+  const startVideoCall = () => {
+    setIsVideoCall(true);
+  };
+
+  const stopVideoCall = () => {
+    setIsVideoCall(false);
   };
 
   const selectedConversation = conversations.find(
@@ -188,48 +197,51 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
               Private conversation
             </p>
           </div>
-          <button
-            title="Start video call"
-            className="rounded p-2 text-[#b5bac1] hover:bg-[#35373c] hover:text-white transition-colors"
-          >
-            <Video className="h-5 w-5" />
-          </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#1e1f22] p-5 scrollbar-thin">
-          {loading ? (
-            <DMListSkeleton />
-          ) : (
-            messages.map((message) => (
-              <div key={message.id} className="flex gap-3">
-                <Image
-                  src={message.member.profile.imageUrl}
-                  alt={message.member.profile.name}
-                  width={36}
-                  height={36}
-                  unoptimized
-                  className="h-9 w-9 shrink-0 rounded-full object-cover"
-                />
-                <div>
-                  <div className="flex items-baseline gap-2">
-                    <b className="text-sm text-white">
-                      {message.member.profile.name}
-                    </b>
-                    <time className="text-[11px] text-[#949ba4]">
-                      {new Date(message.CreatedAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </time>
+        {isVideoCall ? (
+          <div className="flex-1 flex items-center justify-center bg-[#1e1f22]">
+            <div className="text-center">
+              <h3 className="text-xl text-white mb-4">Video call in progress</h3>
+              <Button onClick={stopVideoCall}>End call</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#1e1f22] p-5 scrollbar-thin">
+            {loading ? (
+              <DMListSkeleton />
+            ) : (
+              messages.map((message) => (
+                <div key={message.id} className="flex gap-3">
+                  <Image
+                    src={message.member.profile.imageUrl}
+                    alt={message.member.profile.name}
+                    width={36}
+                    height={36}
+                    unoptimized
+                    className="h-9 w-9 shrink-0 rounded-full object-cover"
+                  />
+                  <div>
+                    <div className="flex items-baseline gap-2">
+                      <b className="text-sm text-white">
+                        {message.member.profile.name}
+                      </b>
+                      <time className="text-[11px] text-[#949ba4]">
+                        {new Date(message.CreatedAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </time>
+                    </div>
+                    <p className="text-sm text-[#dbdee1]">{message.content}</p>
                   </div>
-                  <p className="text-sm text-[#dbdee1]">{message.content}</p>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        )}
 
-        {selected && (
+        {selected && !isVideoCall && (
           <form
             className="flex shrink-0 gap-2 border-t border-[#1f2023] bg-[#1e1f22] p-4"
             onSubmit={(event) => {

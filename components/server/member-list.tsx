@@ -72,7 +72,11 @@ export const MemberList = ({
         body: JSON.stringify({ role }),
       },
     );
-    if (response.ok) router.refresh();
+    if (response.ok) {
+      // Use a slight delay to prevent rapid re-renders from causing glitching
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      router.refresh();
+    }
   };
 
   const kick = async (memberId: string) => {

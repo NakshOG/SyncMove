@@ -6,7 +6,7 @@ const repoRoot = path.resolve(__dirname, '..');
 
 describe('deployment topology', () => {
   it('runs a multi-node app behind nginx with primary and replica databases', () => {
-    const compose = fs.readFileSync(path.join(repoRoot, 'docker-compose.multi.yml'), 'utf8');
+    const compose = fs.readFileSync(path.join(repoRoot, 'docker-compose.sfu.yml'), 'utf8');
 
     expect(compose).toContain('nginx:');
     expect(compose).toContain('app-node-1');
@@ -19,7 +19,7 @@ describe('deployment topology', () => {
   });
 
   it('keeps the primary DB as the write source and replica as read-only', () => {
-    const compose = fs.readFileSync(path.join(repoRoot, 'docker-compose.multi.yml'), 'utf8');
+    const compose = fs.readFileSync(path.join(repoRoot, 'docker-compose.sfu.yml'), 'utf8');
 
     expect(compose).toContain('mariadb-primary');
     expect(compose).toContain('mariadb-replica');
@@ -45,17 +45,30 @@ describe('ACID / integrity contract', () => {
     expect(envSample).toContain('DATABASE_URL=');
     expect(envSample).toContain('REPLICA_DATABASE_URL=');
     expect(envSample).toContain('REDIS_URL=');
+    expect(envSample).toContain('MEDIASOUP_URL=');
   });
 });
 
-describe('webrtc media pipeline', () => {
-  it('uses browser WebRTC codecs plus DTLS-SRTP transport encryption for audio/video', () => {
+describe('webrtc media pipeline (Mediasoup SFU)', () => {
+  it('uses Mediasoup SFU for audio/video media routing', () => {
     const callRoom = fs.readFileSync(path.join(repoRoot, 'components/chat/call-room.tsx'), 'utf8');
 
+    // Check for Mediasoup client usage
     expect(callRoom).toContain('getUserMedia');
-    expect(callRoom).toContain('RTCPeerConnection');
-    expect(callRoom).toMatch(/DTLS-SRTp|DTLS-SRTP|SRTP/i);
-    expect(callRoom).toContain('generateCertificate');
-    expect(callRoom).toContain('iceServers');
+    expect(callRoom).toContain('mediasoup');
+    expect(callRoom).toContain('Device');
+    expect(callRoom).toContain('createSendTransport');
+    expect(callRoom).toContain('produce');
+    expect(callRoom).toContain('Consumer');
+  });
+
+  it('Mediasoup server uses WebRTC transport and SFU routing', () => {
+    const server = fs.readFileSync(path.join(repoRoot, 'server/mediasoup-server.ts'), 'utf8');
+
+    expect(server).toContain('Worker');
+    expect(server).toContain('createWebRtcTransport');
+    expect(server).toContain('createRouter');
+    expect(server).toContain('produce');
+    expect(server).toContain('consume');
   });
 });

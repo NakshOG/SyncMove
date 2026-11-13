@@ -3,6 +3,7 @@
 import { UploadDropzone } from "@/lib/uploadthing";
 import { X } from "lucide-react";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 interface FileUploadProps {
   onChange: (url?: string) => void;
@@ -53,8 +54,14 @@ const compressImage = async (file: File, maxDimension: number) => {
 };
 
 export const FileUpload = ({ onChange, value, endpoint }: FileUploadProps) => {
-  // Check if a URL string exists (UploadThing URLs don't always end with explicit file extensions)
-  const isImage = Boolean(value);
+  const [localValue, setLocalValue] = useState(value);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const isImage = Boolean(localValue);
 
   if (isImage) {
     return (
@@ -62,16 +69,26 @@ export const FileUpload = ({ onChange, value, endpoint }: FileUploadProps) => {
         <div className="relative h-24 w-24">
           <Image
             fill
-            src={value}
-            alt="Profile preview"
+            src={localValue}
+            alt="File preview"
             sizes="96px"
-            className="rounded-full object-cover border-2 border-zinc-700 shadow-md"
+            className="rounded-lg object-cover border-2 border-zinc-700 shadow-md"
+            onLoad={() => setIsPreviewLoading(false)}
+            onError={() => setIsPreviewLoading(true)}
           />
+          {isPreviewLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-zinc-800 rounded-lg">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent"></div>
+            </div>
+          )}
           <button
-            onClick={() => onChange("")}
-            className="bg-rose-500 text-white p-1.5 rounded-full absolute -top-1 -right-1 shadow-md hover:bg-rose-600 transition-all hover:scale-105"
+            onClick={() => {
+              setLocalValue("");
+              onChange("");
+            }}
+            className="bg-rose-500 text-white p-1.5 rounded-full absolute -top-1.5 -right-1.5 shadow-md hover:bg-rose-600 transition-all hover:scale-110"
             type="button"
-            title="Remove image"
+            title="Remove file"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -98,7 +115,7 @@ export const FileUpload = ({ onChange, value, endpoint }: FileUploadProps) => {
       }}
       appearance={{
         container:
-          "w-full h-36 border-2 border-dashed border-zinc-700 bg-zinc-800/40 hover:bg-zinc-800/70 rounded-xl flex flex-col items-center justify-center transition-colors cursor-pointer",
+          "w-full h-36 border-2 border-dashed border-zinc-700 bg-zinc-800/40 hover:bg-zinc-800/70 rounded-lg flex flex-col items-center justify-center transition-colors cursor-pointer",
         uploadIcon: "w-7 h-7 text-zinc-400 mb-1",
         label:
           "text-xs font-medium text-zinc-300 hover:text-white transition-colors",

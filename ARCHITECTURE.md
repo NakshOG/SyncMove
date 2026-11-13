@@ -29,7 +29,7 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              USER'S BROWSER                                   │
 │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────────┐  │
-│  │   React     │◄──┤   Zustand   │◄──┤  Socket.IO  │◄──┤  WebRTC (P2P)   │  │
+│  │   React     │◄──┤   Zustand   │◄──┤  Socket.IO  │◄──┤ Mediasoup Client│  │
 │  │   UI        │   │   State     │   │   Client    │   │   Media Stream  │  │
 │  └──────┬──────┘   └─────────────┘   └─────────────┘   └─────────────────┘  │
 │         │                                                                    │
@@ -52,9 +52,9 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              BACKEND SERVICES                                 │
 │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐  ┌────────────┐ │
-│  │   Next.js      │  │   MariaDB      │  │   Redis        │  │   TURN     │ │
-│  │   API Server   │◄─┤   (Prisma)     │◄─┤  Pub/Sub +     │◄─┤   Server   │ │
-│  │ + Socket.IO    │  │   + SQL Data   │  │  Presence      │  │   Relay    │ │
+│  │   Next.js      │  │   MariaDB      │  │   Redis        │  │ Mediasoup  │ │
+│  │   API Server   │◄─┤   (Prisma)     │◄─┤  Pub/Sub +     │◄─┤   SFU      │ │
+│  │ + Socket.IO    │  │   + SQL Data   │  │  Presence      │  │  (Port 3333)│ │
 │  └───────┬────────┘  └────────────────┘  └───────┬────────┘  └────────────┘ │
 │          │                                         │                             │
 │          └──────────────────────┬──────────────────┘                             │
@@ -83,8 +83,8 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 | **Prisma + MariaDB** | ORM + Database                    | Type-safe queries, migrations, MySQL compatible                                   |
 | **Redis**            | Distributed realtime coordination | Shared pub/sub, shared socket adapter, presence coordination across app instances |
 | **Socket.IO**        | Real-time communication           | Fallback to polling, rooms, events, auto-reconnect, Redis adapter support         |
-| **WebRTC**           | Video/Audio calls                 | Peer-to-peer, encrypted by default (DTLS-SRTP)                                    |
-| **UploadThing**      | File uploads                      | Simple API, works with S3, presigned URLs                                         |
+| **WebRTC**           | Video/Audio calls                 | Peer-to-peer via Mediasoup SFU (DTLS-SRTP)                       |
+| **UploadThing**      | File uploads                      | Simple API, works with S3, presigned URLs                         |
 | **Tailwind CSS**     | Styling                           | Rapid UI development, consistent design system                                    |
 | **Zustand**          | State management                  | Simple, minimal boilerplate, works with React                                     |
 | **Web Crypto API**   | Encryption                        | Native browser API, secure, no external dependencies                              |
@@ -192,7 +192,7 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 
 ### Video/Audio Calls
 
-**Technology**: WebRTC (Peer-to-Peer)
+**Technology**: WebRTC via Mediasoup SFU
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -208,55 +208,57 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 │   Socket.IO: "join-call" → Server                                │
 │          │                                                       │
 │          ▼                                                       │
-│   WebRTC: Create RTCPeerConnection                               │
+│   WebRTC: Create WebRtcTransport to Mediasoup SFU              │
 │          │                                                       │
 │          ▼                                                       │
-│   Create offer → Set local description → Send to peer            │
+│   SFU: Create producer (send stream)                            │
 │          │                                                       │
 │          ▼                                                       │
-│   Peer receives offer → Create answer → ICE candidate exchange   │
+│   SFU: Broadcast producer to all consumers in room              │
 │          │                                                       │
 │          ▼                                                       │
-│   P2P connection established (DTLS-SRTP encrypted)               │
+│   Users B, C, D receive consumer streams from SFU              │
 │          │                                                       │
 │          ▼                                                       │
-│   Media streams flow directly between peers                      │
-│          │                                                       │
-│          ▼                                                       │
-│   No server involvement after connection (bandwidth efficient)   │
+│   Media streams flow through SFU (not P2P)                      │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 **Files**:
 
-- `components/chat/call-room.tsx` - WebRTC logic
-- `pages/api/socket/io.ts` - Call signaling
+- `components/chat/call-room.tsx` - Mediasoup client
+- `server/mediasoup-server.ts` - SFU WebSocket signaling
+- `app/api/calls/route.ts` - SFU API routes
 
 **WebRTC Security**:
 
 ```typescript
-// DTLS-SRTP is ENFORCED
-const pc = new RTCPeerConnection({
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-  bundlePolicy: "max-bundle", // Bundles all streams over one DTLS connection
-  rtcpMuxPolicy: "require", // Requires RTCP multiplexing
-  // certificates generated automatically with ECDSA
+// DTLS-SRTP is ENFORCED by Mediasoup
+const transport = await worker.router.createWebRtcTransport({
+  listenIps: [{ ip: '0.0.0.0', announcedIp: 'localhost' }],
+  initialAvailableOutgoingBitrate: 1000000,
+  enableUdp: true,
+  enableTcp: true,
+  preferUdp: true,
 });
 
 // All media is encrypted with SRTP
 ```
 
-**ICE Servers**:
+**SFU Server**:
 
-- **STUN** (stun.l.google.com:19302) - NAT traversal helper
-- **TURN** (you add) - Relay server for when P2P fails
+- Mediasoup SFU runs on port 3333
+- Handles all media routing
+- No STUN/TURN needed (SFU acts as relay)
+- Scalable to 100+ participants
 
-**Why WebRTC?**
+**Why Mediasoup SFU?**
 
 - Built into browsers (no plugins)
 - Encrypts media by default (DTLS-SRTP)
-- Efficient (direct P2P, no server bandwidth)
+- Scalable (SFU routing, not O(N²) P2P)
+- Bandwidth efficient (O(N) complexity)
 
 ---
 

@@ -1,4 +1,24 @@
+version: '3.8'
+
 services:
+  # Mediasoup SFU Server (replaces P2P mesh + Coturn)
+  mediasoup-sfu:
+    image: node:20-alpine
+    container_name: syncmove-sfu
+    working_dir: /app
+    command: sh -c "npm install mediasoup socket.io && node mediasoup-server.js"
+    ports:
+      - "3333:3333"
+      - "49152-65535:49152-65535/udp"
+    environment:
+      - MEDIASOUP_ANNOUNCED_IP=localhost
+      - MEDIASOUP_PORT=3333
+    volumes:
+      - ./server:/app/server
+    networks:
+      - syncmove-network
+    restart: unless-stopped
+
   nginx:
     image: nginx:1.27-alpine
     container_name: syncmove-nginx
@@ -9,6 +29,7 @@ services:
     depends_on:
       - app-node-1
       - app-node-2
+      - mediasoup-sfu
     networks:
       - syncmove-network
     restart: unless-stopped
@@ -22,24 +43,6 @@ services:
       - syncmove-network
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
-
-  coturn:
-    image: coturn/coturn:latest
-    container_name: syncmove-turn
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      TURN_SERVER_NAME: ${COTURN_DOMAIN:-localhost}
-      REALM: ${COTURN_REALM:-syncmove.local}
-      SECRET: ${COTURN_SECRET:-your-secret-key-here}
-      min-port: 49152
-      max-port: 65535
-    volumes:
-      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-      - coturn-data:/var/lib/coturn
-    networks:
-      - syncmove-network
 
   mariadb-primary:
     image: mariadb:10.11
@@ -116,11 +119,11 @@ services:
       REPLICA_USER: replica
       REPLICA_PASSWORD: replica
     volumes:
-      - ./scripts:/scripts:ro
+      - ./scripts:/scripts:rw
     networks:
       - syncmove-network
     command: >
-      bash -lc "chmod +x /scripts/db-failover.sh /scripts/db-rejoin-replica.sh && /scripts/db-failover.sh"
+      bash -c "chmod +x /scripts/*.sh 2>/dev/null || true; /scripts/db-failover.sh"
     restart: unless-stopped
 
   app-node-1:
@@ -142,18 +145,15 @@ services:
       NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL}
       NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL}
       NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL}
-      UPLOADTHING_SECRET: ${UPLOADTHING_SECRET}
-      UPLOADTHING_APP_ID: ${UPLOADTHING_APP_ID}
-      UPLOADTHING_TOKEN: ${UPLOADTHING_TOKEN}
-      NEXT_PUBLIC_TURN_SERVER_URL: ${NEXT_PUBLIC_TURN_SERVER_URL}
-      NEXT_PUBLIC_TURN_USERNAME: ${NEXT_PUBLIC_TURN_USERNAME}
-      NEXT_PUBLIC_TURN_CREDENTIAL: ${NEXT_PUBLIC_TURN_CREDENTIAL}
+      NEXT_PUBLIC_MEDIASOUP_URL: ws://mediasoup-sfu:3333
     depends_on:
       mariadb-primary:
         condition: service_healthy
       mariadb-replica:
         condition: service_healthy
       redis:
+        condition: service_started
+      mediasoup-sfu:
         condition: service_started
     ports:
       - "3001:3000"
@@ -181,18 +181,15 @@ services:
       NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL}
       NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL}
       NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL}
-      UPLOADTHING_SECRET: ${UPLOADTHING_SECRET}
-      UPLOADTHING_APP_ID: ${UPLOADTHING_APP_ID}
-      UPLOADTHING_TOKEN: ${UPLOADTHING_TOKEN}
-      NEXT_PUBLIC_TURN_SERVER_URL: ${NEXT_PUBLIC_TURN_SERVER_URL}
-      NEXT_PUBLIC_TURN_USERNAME: ${NEXT_PUBLIC_TURN_USERNAME}
-      NEXT_PUBLIC_TURN_CREDENTIAL: ${NEXT_PUBLIC_TURN_CREDENTIAL}
+      NEXT_PUBLIC_MEDIASOUP_URL: ws://mediasoup-sfu:3333
     depends_on:
       mariadb-primary:
         condition: service_healthy
       mariadb-replica:
         condition: service_healthy
       redis:
+        condition: service_started
+      mediasoup-sfu:
         condition: service_started
     ports:
       - "3002:3000"
@@ -203,7 +200,6 @@ services:
 
 volumes:
   mariadb-primary-data:
-  coturn-data:
 
 networks:
   syncmove-network:
