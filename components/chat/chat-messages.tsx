@@ -6,6 +6,7 @@ import { Pencil, Pin, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChatInput } from "./chat-input";
+import { EncryptedFileDownload } from "./encrypted-file-upload";
 import { useSocket } from "@/components/providers/socket-provider";
 import { useE2EEContext } from "@/components/providers/e2ee-provider";
 import { ChatMessagesSkeleton } from "./chat-messages-skeleton";
@@ -39,9 +40,10 @@ export const ChatMessages = ({
   const [showPinned, setShowPinned] = useState(false);
   const [decryptedCache] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [memberIds, setMemberIds] = useState<string[]>([]);
 
   const { socket, isConnected } = useSocket();
-  const { decryptFromChannel, initialized } = useE2EEContext();
+  const { decryptFromChannel, initialized, establishChannelSession } = useE2EEContext();
 
   const load = useCallback(
     async (before?: string) => {
@@ -55,8 +57,10 @@ export const ChatMessages = ({
         const data = (await response.json()) as {
           messages: ChatMessage[];
           hasMore: boolean;
+          memberIds?: string[];
         };
         setHasMore(data.hasMore);
+        if (data.memberIds) setMemberIds(data.memberIds);
         setMessages((current) =>
           before ? [...data.messages, ...current] : data.messages,
         );
@@ -103,6 +107,14 @@ export const ChatMessages = ({
       if (interval) clearInterval(interval);
     };
   }, [channelId, isConnected, load, socket]);
+
+  useEffect(() => {
+    if (!initialized || memberIds.length === 0) return;
+    const recipients = memberIds.filter((memberId) => memberId !== profileId);
+    if (recipients.length > 0) {
+      void establishChannelSession(channelId, recipients);
+    }
+  }, [channelId, establishChannelSession, initialized, memberIds, profileId]);
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -242,7 +254,16 @@ export const ChatMessages = ({
           )}
 
           {displayedMessages.map((message) => {
-            const displayContent = message.content;
+            let attachment: { fileName: string; metadata: React.ComponentProps<typeof EncryptedFileDownload>["metadata"] } | null = null;
+            try {
+              const parsed = JSON.parse(message.content) as { type?: string; fileName?: string; metadata?: React.ComponentProps<typeof EncryptedFileDownload>["metadata"] };
+              if (parsed.type === "encrypted-file" && parsed.fileName && parsed.metadata) {
+                attachment = { fileName: parsed.fileName, metadata: parsed.metadata };
+              }
+            } catch {
+              // Normal text message.
+            }
+            const displayContent = attachment ? `📎 ${attachment.fileName}` : message.content;
 
             return (
               <article
@@ -308,16 +329,16 @@ export const ChatMessages = ({
                     </p>
                   )}
 
-                  {message.fileUrl && (
-                    <a
-                      className="mt-1 inline-block text-sm text-[#a5b4fc] hover:underline"
-                      href={message.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View attachment
-                    </a>
-                  )}
+                  {message.fileUrl && attachment ? (
+                    <EncryptedFileDownload
+                      fileUrl={message.fileUrl}
+                      metadata={attachment.metadata}
+                      fileName={attachment.fileName}
+                      channelId={channelId}
+                    />
+                  ) : message.fileUrl ? (
+                    <a className="mt-1 inline-block text-sm text-[#a5b4fc] hover:underline" href={message.fileUrl} target="_blank" rel="noreferrer">View attachment</a>
+                  ) : null}
                 </div>
 
                 {!message.deleted && (

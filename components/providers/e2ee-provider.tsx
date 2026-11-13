@@ -153,7 +153,11 @@ export function E2EEProvider({ children }: { children: ReactNode }) {
 
     // Establish sessions with each member
     for (const memberId of memberIds) {
-      await e2ee.establishSession(memberId);
+      try {
+        await e2ee.establishSession(memberId);
+      } catch (error) {
+        console.error("[E2EE] Unable to establish channel member session", memberId, error);
+      }
     }
   };
 

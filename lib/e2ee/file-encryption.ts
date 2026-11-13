@@ -42,6 +42,9 @@ export interface EncryptedFile {
 export interface EncryptionResult {
   metadata: EncryptedFileMetadata;
   encryptedBlob: Blob;        // For upload
+  // Raw AES key is returned only to the caller so it can be wrapped with the
+  // channel's E2EE session before metadata leaves the browser.
+  fileKey: Uint8Array;
   preview?: {                 // Optional preview (first 1KB decrypted)
     data: Uint8Array;
     mimeType: string;
@@ -205,6 +208,7 @@ export async function encryptFile(
   return {
     metadata,
     encryptedBlob: new Blob([encryptedData], { type: "application/octet-stream" }),
+    fileKey: encryptedKey,
   };
 }
 

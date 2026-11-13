@@ -41,6 +41,7 @@ export const MemberList = ({
     currentProfileId,
   ]);
   const [loading, setLoading] = useState(true);
+  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
   const canManage =
     currentRole === MemberRole.ADMIN || currentRole === MemberRole.MODERATOR;
 
@@ -64,18 +65,17 @@ export const MemberList = ({
   }, [currentProfileId, router, serverId, socket]);
 
   const updateRole = async (memberId: string, role: MemberRole) => {
-    const response = await fetch(
-      `/api/servers/${serverId}/members/${memberId}`,
-      {
+    if (updatingMemberId) return;
+    setUpdatingMemberId(memberId);
+    try {
+      const response = await fetch(`/api/servers/${serverId}/members/${memberId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role }),
-      },
-    );
-    if (response.ok) {
-      // Use a slight delay to prevent rapid re-renders from causing glitching
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      router.refresh();
+      });
+      if (response.ok) router.refresh();
+    } finally {
+      setUpdatingMemberId(null);
     }
   };
 
@@ -201,6 +201,7 @@ export const MemberList = ({
                   className="bg-[#2b2d31] border-[#1f2023]"
                 >
                   <DropdownMenuItem
+                    disabled={updatingMemberId === member.id}
                     className="text-[#dbdee1] focus:bg-[#35373c]"
                     onClick={() =>
                       void updateRole(
@@ -211,7 +212,9 @@ export const MemberList = ({
                       )
                     }
                   >
-                    {member.role === MemberRole.MODERATOR
+                    {updatingMemberId === member.id
+                      ? "Updating..."
+                      : member.role === MemberRole.MODERATOR
                       ? "Remove moderator"
                       : "Make moderator"}
                   </DropdownMenuItem>

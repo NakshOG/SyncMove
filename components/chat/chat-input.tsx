@@ -4,7 +4,7 @@ import { Paperclip, Send, Smile, X } from "lucide-react";
 import { FormEvent, useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FileUpload } from "@/components/ui/file-upload";
+import { EncryptedFileUpload } from "./encrypted-file-upload";
 import { useE2EEContext } from "@/components/providers/e2ee-provider";
 import { E2EEIndicator } from "./e2ee-indicator";
 
@@ -16,7 +16,6 @@ export const ChatInput = ({
   onSent: () => void;
 }) => {
   const [content, setContent] = useState("");
-  const [fileUrl, setFileUrl] = useState("");
   const [showUpload, setShowUpload] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [sending, setSending] = useState(false);
@@ -44,7 +43,7 @@ export const ChatInput = ({
   ];
 
   const handleSend = useCallback(async () => {
-    if (!content.trim() && !fileUrl) return;
+    if (!content.trim()) return;
     setSending(true);
 
     try {
@@ -67,7 +66,6 @@ export const ChatInput = ({
         body: JSON.stringify({
           channelId,
           content: finalContent,
-          fileUrl: fileUrl || undefined,
           encrypted: isEncrypted,
         }),
       });
@@ -75,7 +73,6 @@ export const ChatInput = ({
       if (!response.ok) throw new Error(await response.text());
 
       setContent("");
-      setFileUrl("");
       setShowUpload(false);
       onSent();
     } catch (error) {
@@ -83,7 +80,7 @@ export const ChatInput = ({
     } finally {
       setSending(false);
     }
-  }, [content, fileUrl, channelId, onSent, encryptForChannel, initialized]);
+  }, [content, channelId, onSent, encryptForChannel, initialized]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -101,10 +98,12 @@ export const ChatInput = ({
       {showUpload && (
         <div className="mx-auto mb-3 flex w-full max-w-5xl items-start gap-2">
           <div className="w-full max-w-sm">
-            <FileUpload
-              endpoint="MessageFile"
-              value={fileUrl}
-              onChange={(url) => setFileUrl(url ?? "")}
+            <EncryptedFileUpload
+              channelId={channelId}
+              onUploadComplete={() => {
+                setShowUpload(false);
+                onSent();
+              }}
             />
           </div>
           <Button
@@ -185,7 +184,7 @@ export const ChatInput = ({
           type="submit"
           size="icon"
           className="h-11 w-11 rounded-xl bg-[#5865f2] text-white hover:bg-[#4752c4] transition-colors [&_svg]:text-white"
-          disabled={sending || (!content.trim() && !fileUrl)}
+          disabled={sending || !content.trim()}
         >
           <Send />
         </Button>

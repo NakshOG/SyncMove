@@ -31,6 +31,13 @@ export async function POST(req: Request) {
       return new NextResponse("Missing required fields", { status: 400 });
     }
 
+    // This endpoint is ciphertext-only. Normal MessageFile uploads must use
+    // the regular UI; accepting arbitrary MIME data here would allow a
+    // plaintext object to be stored remotely under the encrypted route.
+    if (file.type !== "application/octet-stream") {
+      return new NextResponse("Encrypted uploads must be application/octet-stream", { status: 415 });
+    }
+
     // Validate channel membership
     const channel = await db.channel.findFirst({
       where: {
@@ -49,6 +56,9 @@ export async function POST(req: Request) {
 
     // Parse metadata
     const metadata = JSON.parse(metadataJson);
+    if (typeof metadata.wrappedKey !== "string" || !metadata.wrappedKey) {
+      return new NextResponse("Missing encrypted file key", { status: 400 });
+    }
 
     // Convert File to ArrayBuffer for UploadThing
     const arrayBuffer = await file.arrayBuffer();
@@ -87,8 +97,14 @@ export async function POST(req: Request) {
 
     const message = await db.message.create({
       data: {
-        content: `📎 ${metadata.fileName}`,
+        content: JSON.stringify({
+          v: 1,
+          type: "encrypted-file",
+          fileName: metadata.fileName,
+          metadata,
+        }),
         fileUrl,
+        encrypted: true,
         channelId,
         memberId: member.id,
       },

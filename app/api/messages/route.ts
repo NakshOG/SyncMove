@@ -32,7 +32,17 @@ export async function GET(req: Request) {
     include: { member: { include: { profile: true } } },
   });
 
-  return NextResponse.json({ messages: messages.reverse(), hasMore: messages.length === limit, query: query ?? null });
+  const members = await db.member.findMany({
+    where: { serverId: channel.serverId },
+    select: { profileId: true },
+  });
+
+  return NextResponse.json({
+    messages: messages.reverse(),
+    hasMore: messages.length === limit,
+    query: query ?? null,
+    memberIds: members.map((member) => member.profileId),
+  });
 }
 
 export async function POST(req: Request) {

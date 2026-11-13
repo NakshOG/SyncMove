@@ -17,10 +17,9 @@ import {
   VolumeX,
   Wifi,
 } from "lucide-react";
-import type { Socket } from "socket.io-client";
+import { io, type Socket } from "socket.io-client";
 import { Device, types } from "mediasoup-client";
 import { Button } from "@/components/ui/button";
-import { useSocket } from "@/components/providers/socket-provider";
 
 type Participant = {
   id: string;
@@ -139,11 +138,9 @@ export const CallRoom = ({
   currentParticipant: Omit<Participant, "socketId">;
   participants: Omit<Participant, "socketId">[];
 }) => {
-  const { socket, isConnected } = useSocket();
 
   // Mediasoup objects live in refs so changing them never re-runs effects or cleanup.
   const socketRef = useRef<Socket | null>(null);
-  socketRef.current = socket as Socket | null;
   const deviceRef = useRef<Device | null>(null);
   const sendTransportRef = useRef<types.Transport | null>(null);
   const recvTransportRef = useRef<types.Transport | null>(null);
@@ -170,6 +167,7 @@ export const CallRoom = ({
   const [present, setPresent] = useState<Participant[]>([]);
   const [connectionQuality, setConnectionQuality] = useState<"excellent" | "good" | "fair" | "poor">("good");
   const [remoteStreams, setRemoteStreams] = useState<RemoteStream[]>([]);
+  const [callError, setCallError] = useState<string | null>(null);
 
   const encrypted = active; // WebRTC media is always DTLS-SRTP encrypted once connected.
 
@@ -207,6 +205,8 @@ export const CallRoom = ({
           sock.off("call-presence", l.onPresence);
         }
       }
+      sock?.disconnect();
+      socketRef.current = null;
       listenersRef.current = null;
 
       producersRef.current.forEach((p) => p.close());
@@ -241,11 +241,6 @@ export const CallRoom = ({
 
   // Leave when the component unmounts.
   useEffect(() => () => cleanup(true), [cleanup]);
-
-  // Drop the call if the socket connection is lost.
-  useEffect(() => {
-    if (active && !isConnected) cleanup(false);
-  }, [active, isConnected, cleanup]);
 
   const consumeProducer = useCallback(
     async (producerId: string, socketId: string) => {
@@ -289,11 +284,31 @@ export const CallRoom = ({
   );
 
   const start = async () => {
-    const sock = socketRef.current;
-    if (!sock || !isConnected || joining || active) return;
+    if (joining || active) return;
     setJoining(true);
+    setCallError(null);
 
     try {
+      const endpoint = process.env.NEXT_PUBLIC_MEDIASOUP_URL ?? "ws://localhost:3333";
+      const sock = io(endpoint, {
+        autoConnect: false,
+        transports: ["websocket", "polling"],
+        reconnection: false,
+        timeout: 10000,
+      });
+      await new Promise<void>((resolve, reject) => {
+        const timer = window.setTimeout(() => reject(new Error("SFU connection timed out")), 10000);
+        sock.once("connect", () => {
+          window.clearTimeout(timer);
+          resolve();
+        });
+        sock.once("connect_error", (error) => {
+          window.clearTimeout(timer);
+          reject(error);
+        });
+        sock.connect();
+      });
+      socketRef.current = sock;
       const media = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: video
@@ -370,6 +385,7 @@ export const CallRoom = ({
       setJoining(false);
     } catch (error) {
       console.error("Unable to start call:", error);
+      setCallError(error instanceof Error ? error.message : "Unable to connect to the SFU");
       cleanup(true);
     }
   };
@@ -473,6 +489,7 @@ export const CallRoom = ({
             <p className="text-xs text-[#949ba4]">
               {active ? `Connected · ${durationText}` : joining ? "Connecting..." : "Ready to connect"}
             </p>
+            {callError && <p className="mt-1 max-w-sm text-xs text-[#f23f42]">{callError}</p>}
           </div>
         </div>
         <div className="flex items-center gap-3 text-xs text-[#b5bac1]">
@@ -582,7 +599,7 @@ export const CallRoom = ({
           {!active ? (
             <Button
               onClick={() => void start()}
-              disabled={joining || !isConnected}
+              disabled={joining}
               className="h-11 rounded-xl bg-[#5865f2] px-5 transition-colors hover:bg-[#4752c4]"
             >
               <Phone className="mr-2 h-4 w-4" />

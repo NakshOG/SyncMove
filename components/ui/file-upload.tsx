@@ -61,7 +61,7 @@ export const FileUpload = ({ onChange, value, endpoint }: FileUploadProps) => {
     setLocalValue(value);
   }, [value]);
 
-  const isImage = Boolean(localValue);
+  const isImage = endpoint === "ServerImage" && Boolean(localValue);
 
   if (isImage) {
     return (
@@ -74,7 +74,7 @@ export const FileUpload = ({ onChange, value, endpoint }: FileUploadProps) => {
             sizes="96px"
             className="rounded-lg object-cover border-2 border-zinc-700 shadow-md"
             onLoad={() => setIsPreviewLoading(false)}
-            onError={() => setIsPreviewLoading(true)}
+            onError={() => setIsPreviewLoading(false)}
           />
           {isPreviewLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-zinc-800 rounded-lg">
@@ -108,7 +108,8 @@ export const FileUpload = ({ onChange, value, endpoint }: FileUploadProps) => {
         )
       }
       onClientUploadComplete={(res) => {
-        onChange(res[0]?.url);
+        const uploaded = res[0] as { url?: string; ufsUrl?: string } | undefined;
+        onChange(uploaded?.ufsUrl ?? uploaded?.url);
       }}
       onUploadError={(error: Error) => {
         console.error("Upload Error:", error);
