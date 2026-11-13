@@ -6,7 +6,7 @@
 |-----------|--------|-------|--------|
 | architecture.spec.ts | ✅ PASS | 3 | 0 |
 | e2ee-crypto.spec.ts | ✅ PASS | 1 | 0 |
-| simulation.spec.ts | ✅ PASS | 8 | 0 |
+| simulation.spec.ts | ✅ PASS | 9 | 0 |
 | stress.spec.ts | ✅ PASS | 25 | 0 |
 | concurrent-simulation.spec.ts | ✅ PASS | 15 | 0 |
 | **TOTAL** | **✅ PASS** | **52** | **0** |

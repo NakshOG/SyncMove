@@ -1,38 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as mediasoup from 'mediasoup';
+import type { types } from 'mediasoup';
 import { v4 as uuidv4 } from 'uuid';
 import { mediaSoupConfig } from '@/lib/mediasoup-client';
+
+const mediaCodecs: types.RouterRtpCodecCapability[] = [
+  { kind: 'audio', mimeType: 'audio/opus', clockRate: 48000, channels: 2 },
+  { kind: 'video', mimeType: 'video/VP8', clockRate: 90000, parameters: { 'x-google-start-bitrate': 1000 } },
+];
 
 export async function POST(request: NextRequest) {
   try {
     const { roomId } = await request.json();
-    
+
     const workerId = roomId;
     let config = mediaSoupConfig.get(workerId);
-    
+
     if (!config) {
-      const mediasoup = await import('mediasoup/node');
-      const worker = new mediasoup.Worker({
-        workerLogLevel: 'warn',
-        mediaCodecs: [
-          {
-            kind: 'audio',
-            mimeType: 'audio/opus',
-            clockRate: 48000,
-            channels: 2,
-          },
-          {
-            kind: 'video',
-            mimeType: 'video/VP8',
-            clockRate: 90000,
-            parameters: {
-              'x-google-start-bitrate': 1000,
-            },
-          },
-        ],
+      const worker = await mediasoup.createWorker({
+        logLevel: 'warn',
       });
 
       const router = await worker.createRouter({
-        mediaCodecs: worker.router.mediaCodecs,
+        mediaCodecs,
       });
 
       config = {

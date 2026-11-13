@@ -1,11 +1,11 @@
+"use client";
+
 /**
  * E2EE Provider Component
  *
  * Wraps the application with E2EE context, providing encryption
  * capabilities to all chat components.
  */
-
-"use client";
 
 import {
   createContext,
