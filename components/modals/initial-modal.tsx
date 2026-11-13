@@ -22,87 +22,70 @@ import {
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "../ui/button";
-import { FileUpload } from "../ui/file-upload";
+
+const DEFAULT_SERVER_IMAGE =
+  "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80";
 
 const formSchema = z.object({
   name: z.string().min(1, {
     message: "Server name is required.",
   }),
-
-  imageUrl: z.string().min(1, {
-    message: "Server image is required.",
-  }),
 });
 
 export const InitialModal = () => {
-  const router=useRouter();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-
     defaultValues: {
       name: "",
-      imageUrl: "",
     },
   });
 
   const isLoading = form.formState.isSubmitting;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-try{
-  await axios.post("/api/servers", values);
-  form.reset();
-  router.refresh();
-  window.location.reload();
-}catch(err){
-console.log("Error creating server:", err);
-}
+    try {
+      const response = await axios.post("/api/servers", {
+        ...values,
+        imageUrl: DEFAULT_SERVER_IMAGE,
+      });
 
+      form.reset();
+      router.push(`/servers/${response.data.id}`);
+      router.refresh();
+    } catch (err) {
+      console.error("Error creating server:", err);
+    }
   };
 
   return (
-    <Dialog open >
-      <DialogContent className="bg-[#2b2d31] text-white p-0 overflow-hidden rounded-xl border border-white/5">
+    <Dialog open>
+      <DialogContent
+        showCloseButton={false}
+        className="bg-[#2b2d31] text-white p-0 overflow-hidden rounded-xl border border-white/5"
+      >
         <DialogHeader className="pt-8 px-6">
           <DialogTitle className="text-2xl text-center font-bold">
             Customize your server
           </DialogTitle>
 
           <DialogDescription className="text-center text-[#949ba4]">
-            Give your server a name and image. You can change it later.
+            Give your server a name. You can change it later.
           </DialogDescription>
         </DialogHeader>
 
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="px-6 pb-6"
-        >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 pb-6">
           <FieldGroup>
-            {/* IMAGEN*/}
-            <Controller
-              name="imageUrl"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                    <FileUpload
-                    endpoint="ServerImage"
-                    value={field.value}
-                    onChange={field.onChange}
-                    />
-                 {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
-            />
-
-            {/* SERVER NAME */}
             <Controller
               name="name"
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel className="uppercase text-xs font-bold text-[#949ba4]">
+                  <FieldLabel
+                    htmlFor="server-name"
+                    className="uppercase text-xs font-bold text-[#949ba4]"
+                  >
                     Server name
                   </FieldLabel>
 
@@ -122,7 +105,6 @@ console.log("Error creating server:", err);
                 </Field>
               )}
             />
-
           </FieldGroup>
 
           <DialogFooter className="bg-[#232428] px-6 py-4 rounded-xl mt-6">
