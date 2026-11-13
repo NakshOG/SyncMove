@@ -5,9 +5,11 @@ import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
+type Conversation = { id: string; [key: string]: unknown };
+
 interface DMSearchProps {
-  conversations: Array<{ id: string; [key: string]: unknown }>;
-  onFilter: (filtered: typeof conversations) => void;
+  conversations: Conversation[];
+  onFilter: (filtered: Conversation[]) => void;
 }
 
 const RECENT_EMOJIS = ["??", "??", "??", "??", "??", "??", "??", "??", "??", "??", "??", "??", "?", "?", "??", "??"];

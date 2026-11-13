@@ -12,6 +12,8 @@ services:
     environment:
       - MEDIASOUP_ANNOUNCED_IP=localhost
       - MEDIASOUP_PORT=3333
+      - MEDIASOUP_RTC_MIN_PORT=49152
+      - MEDIASOUP_RTC_MAX_PORT=65535
     volumes:
       - ./server:/app/server
     networks:
@@ -144,7 +146,9 @@ services:
       NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL}
       NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL}
       NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL}
-      NEXT_PUBLIC_MEDIASOUP_URL: ws://mediasoup-sfu:3333
+      # This value is consumed by the browser, so it must resolve from the
+      # host, not from inside the Docker network.
+      NEXT_PUBLIC_MEDIASOUP_URL: ws://localhost:3333
     depends_on:
       mariadb-primary:
         condition: service_healthy
@@ -180,7 +184,7 @@ services:
       NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL}
       NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL}
       NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL}
-      NEXT_PUBLIC_MEDIASOUP_URL: ws://mediasoup-sfu:3333
+      NEXT_PUBLIC_MEDIASOUP_URL: ws://localhost:3333
     depends_on:
       mariadb-primary:
         condition: service_healthy

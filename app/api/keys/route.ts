@@ -29,7 +29,7 @@ const keyBundleSchema = z.object({
  * GET /api/keys
  * Upload or update own key bundle
  */
-export async function POST(_req: Request) {
+export async function POST(req: Request) {
   try {
     const profile = await currentProfile();
     if (!profile) {
@@ -55,7 +55,7 @@ export async function POST(_req: Request) {
         signature,
         oneTimePreKeyId: oneTimePreKeyId ?? null,
         oneTimePreKey: oneTimePreKey ?? null,
-        updatedAt: new Date(),
+        updated: new Date(),
       },
       create: {
         userId: profile.id,
@@ -102,8 +102,8 @@ export async function GET(_req: Request) {
       signature: keyBundle.signature,
       oneTimePreKeyId: keyBundle.oneTimePreKeyId,
       oneTimePreKey: keyBundle.oneTimePreKey,
-      createdAt: keyBundle.createdAt,
-      updatedAt: keyBundle.updatedAt,
+      createdAt: keyBundle.created,
+      updatedAt: keyBundle.updated,
     });
   } catch (error) {
     console.error("[KEYS_GET] Error:", error);

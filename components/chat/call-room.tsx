@@ -66,12 +66,9 @@ const mergeParticipants = (members: Participant[]): Participant[] => {
 };
 
 function getICEServers(): RTCIceServer[] {
-  // Mediasoup SFU handles media relay; no TURN server needed.
-  // STUN servers are sufficient for NAT traversal to reach the SFU.
-  return [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-  ];
+  // All media is routed through the Mediasoup SFU. Do not discover or
+  // negotiate peer-to-peer candidates through public STUN/TURN services.
+  return [];
 }
 
 // socket.io request/response helper (server must call the ack callback).

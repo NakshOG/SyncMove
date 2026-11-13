@@ -16,7 +16,7 @@ import { NextResponse } from "next/server";
  * Returns only public key material - server cannot decrypt messages
  */
 export async function GET(
-  req: Request,
+  _req: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
@@ -48,7 +48,7 @@ export async function GET(
       oneTimePreKeyId: keyBundle.oneTimePreKeyId,
       oneTimePreKey: keyBundle.oneTimePreKey,
       // Include timestamp for freshness verification (not sensitive)
-      publishedAt: keyBundle.createdAt,
+      publishedAt: keyBundle.created,
     });
   } catch (error) {
     console.error("[PEER_KEYS_GET] Error:", error);
@@ -86,7 +86,7 @@ export async function POST(
       data: {
         oneTimePreKeyId: null,
         oneTimePreKey: null,
-        updatedAt: new Date(),
+        updated: new Date(),
       },
     }).catch(() => {
       // Bundle might not exist or already used
