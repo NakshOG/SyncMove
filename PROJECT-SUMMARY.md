@@ -93,7 +93,7 @@ SyncMove is a real-time communication platform built with Next.js, featuring end
    - SFU receives producer streams
    - SFU forwards to consumers
    - No direct peer-to-peer connections
-   - No TURN server needed (SFU handles relay)
+   - No P2P/STUN/TURN path; SFU handles media relay
 
 ---
 
@@ -264,7 +264,7 @@ docker-compose -f docker-compose.sfu.yml restart
 
 - **WebRTC via Mediasoup SFU** (not P2P)
 - SFU handles routing, transcoding, bandwidth adaptation
-- **No TURN server needed** (SFU acts as relay)
+- **No P2P/STUN/TURN path** (SFU acts as relay)
 - **No peer-to-peer connections** (browser connects to SFU only)
 - Audio/video channel types
 - Scalable to hundreds of participants per room
@@ -346,6 +346,20 @@ npx prisma studio
 
 ---
 
+## Current verification
+
+- 72/72 Vitest tests passed on November 14, 2026.
+- `npm run build` passed.
+- Full lint reports four existing `no-explicit-any` errors in stress-test
+  fixtures and warnings elsewhere.
+- Group messages and encrypted files use the v2 per-recipient X25519/AES-GCM
+  envelope.
+- Private identity keys and session state remain device-local and support
+  encrypted password-backed export/import.
+- Realtime delivery uses authenticated Socket.IO rooms with local delivery and
+  Redis cross-node fan-out.
+- Calls use the Mediasoup SFU only on UDP ports `40000-40099`.
+
 ## Conclusion
 
 SyncMove is a fully functional real-time communication platform with:
@@ -354,6 +368,6 @@ SyncMove is a fully functional real-time communication platform with:
 - ✅ WebRTC media calls (no P2P, no TURN)
 - ✅ Real-time chat
 - ✅ Database failover
-- ✅ Comprehensive testing (52/52 passing)
+- ✅ Comprehensive testing (72/72 current Vitest tests passing)
 
 **Status: Production Ready** ✅

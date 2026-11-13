@@ -1,4 +1,7 @@
-# Test Run Report - November 13, 2026
+# Historical Test Run Report - November 13, 2026
+
+> This file records an older run. The current run on November 14, 2026 passed
+> 72/72 tests; see `TEST-SUMMARY.md` for the current status.
 
 ## Test Summary
 
@@ -170,7 +173,7 @@ tests/
 
 **Status: ALL TESTS PASSING ✅**
 
-- 52/52 tests passing
+- 72/72 current Vitest tests passing
 - SFU migration successful
 - Media server replaced P2P mesh
 - 100+ audio participants now possible (was 6)

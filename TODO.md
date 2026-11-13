@@ -75,8 +75,8 @@ Calls use the Mediasoup SFU only. No TURN server, public STUN server, or P2P fal
 ### Environment variables
 ```bash
 NEXT_PUBLIC_MEDIASOUP_URL=ws://localhost:3333
-MEDIASOUP_RTC_MIN_PORT=49152
-MEDIASOUP_RTC_MAX_PORT=65535
+MEDIASOUP_RTC_MIN_PORT=40000
+MEDIASOUP_RTC_MAX_PORT=40099
 ```
 
 Run the supported local stack with:
@@ -84,3 +84,11 @@ Run the supported local stack with:
 ```bash
 docker compose -f docker-compose.sfu.yml up -d --build
 ```
+
+## Current verification
+
+- Vitest: 72/72 tests passed.
+- Production build: passed.
+- Full lint: four existing `no-explicit-any` errors remain in stress-test
+  fixtures; application build is successful.
+- E2EE private keys and session state have password-protected export/import.

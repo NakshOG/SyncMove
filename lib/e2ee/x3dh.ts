@@ -318,12 +318,25 @@ export function serializeKeyBundle(bundle: KeyBundle): string {
  */
 export function deserializeKeyBundle(data: string): KeyBundle {
   const parsed = JSON.parse(data);
+  const bytes = (value: unknown): Uint8Array => {
+    if (value instanceof Uint8Array) return value;
+    if (Array.isArray(value)) return new Uint8Array(value);
+    if (typeof value === "string") {
+      // The API stores public key bytes as comma-separated decimal values.
+      return new Uint8Array(value.split(",").filter(Boolean).map(Number));
+    }
+    return new Uint8Array();
+  };
+
   return {
-    identityKey: new Uint8Array(parsed.ik),
-    signedPreKey: new Uint8Array(parsed.spk),
-    signedPreKeySignature: new Uint8Array(parsed.spkSig),
-    oneTimePreKeyId: parsed.opkId,
-    oneTimePreKey: parsed.opk ? new Uint8Array(parsed.opk) : null,
+    identityKey: bytes(parsed.ik ?? parsed.identityKey),
+    signedPreKeyId: parsed.signedPreKeyId ?? parsed.spkId ?? "",
+    signedPreKey: bytes(parsed.spk ?? parsed.signedPreKey),
+    signedPreKeySignature: bytes(parsed.spkSig ?? parsed.signedPreKeySignature ?? parsed.signature),
+    oneTimePreKeyId: parsed.opkId ?? parsed.oneTimePreKeyId ?? null,
+    oneTimePreKey: parsed.opk || parsed.oneTimePreKey
+      ? bytes(parsed.opk ?? parsed.oneTimePreKey)
+      : null,
   };
 }
 

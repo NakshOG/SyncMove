@@ -55,13 +55,18 @@ const compressImage = async (file: File, maxDimension: number) => {
 
 export const FileUpload = ({ onChange, value, endpoint }: FileUploadProps) => {
   const [localValue, setLocalValue] = useState(value);
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(Boolean(value));
+  const [previewFailed, setPreviewFailed] = useState(false);
 
   useEffect(() => {
+    // Synchronize the controlled form value with the local preview state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalValue(value);
+    setPreviewFailed(false);
+    setIsPreviewLoading(Boolean(value));
   }, [value]);
 
-  const isImage = endpoint === "ServerImage" && Boolean(localValue);
+  const isImage = endpoint === "ServerImage" && Boolean(localValue) && !previewFailed;
 
   if (isImage) {
     return (
@@ -74,7 +79,10 @@ export const FileUpload = ({ onChange, value, endpoint }: FileUploadProps) => {
             sizes="96px"
             className="rounded-lg object-cover border-2 border-zinc-700 shadow-md"
             onLoad={() => setIsPreviewLoading(false)}
-            onError={() => setIsPreviewLoading(false)}
+            onError={() => {
+              setIsPreviewLoading(false);
+              setPreviewFailed(true);
+            }}
           />
           {isPreviewLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-zinc-800 rounded-lg">

@@ -22,14 +22,13 @@ import {
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "../ui/button";
-
-const DEFAULT_SERVER_IMAGE =
-  "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80";
+import { FileUpload } from "../ui/file-upload";
 
 const formSchema = z.object({
   name: z.string().min(1, {
     message: "Server name is required.",
   }),
+  imageUrl: z.string().url("Upload a server image.").min(1, "Server image is required."),
 });
 
 export const InitialModal = () => {
@@ -39,6 +38,7 @@ export const InitialModal = () => {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
+      imageUrl: "",
     },
   });
 
@@ -48,7 +48,6 @@ export const InitialModal = () => {
     try {
       const response = await axios.post("/api/servers", {
         ...values,
-        imageUrl: DEFAULT_SERVER_IMAGE,
       });
 
       form.reset();
@@ -77,6 +76,16 @@ export const InitialModal = () => {
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 pb-6">
           <FieldGroup>
+            <Controller
+              name="imageUrl"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FileUpload endpoint="ServerImage" value={field.value} onChange={field.onChange} />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
             <Controller
               name="name"
               control={form.control}

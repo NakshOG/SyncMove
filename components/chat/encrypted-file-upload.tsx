@@ -267,7 +267,7 @@ export function EncryptedFileDownload({
     "idle" | "downloading" | "decrypting" | "complete" | "error"
   >("idle");
   const [, setProgress] = useState(0);
-  const [, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { decryptFromChannel } = useE2EEContext();
 
   const handleDownload = useCallback(async () => {
@@ -340,6 +340,11 @@ export function EncryptedFileDownload({
         {downloadState === "complete" && "Done"}
         {downloadState === "error" && "Retry"}
       </Button>
+      {error && (
+        <p className="basis-full text-xs text-[#f23f42]" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

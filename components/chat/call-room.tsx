@@ -91,32 +91,42 @@ const RemoteTile = ({
   deafened: boolean;
 }) => {
   const element = useRef<HTMLVideoElement>(null);
+  const [imageFailed, setImageFailed] = useState(false);
   const hasVideo = stream.getVideoTracks().length > 0;
 
   useEffect(() => {
-    if (element.current) element.current.srcObject = stream;
+    if (element.current) {
+      element.current.srcObject = stream;
+      void element.current.play().catch(() => {
+        // Playback can be blocked until the user interacts with the call UI.
+      });
+    }
   }, [stream]);
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/5 bg-[#111214] shadow-lg">
+    <div className="relative min-h-40 overflow-hidden rounded-xl border border-white/5 bg-[#111214] shadow-lg">
       {/* A <video> element also plays audio-only streams. */}
       <video
         ref={element}
         autoPlay
         playsInline
         muted={deafened}
-        className={`w-full object-cover ${hasVideo ? "aspect-video" : "h-24"}`}
+        className={`h-full min-h-40 w-full object-cover ${hasVideo ? "aspect-video" : "absolute inset-0 opacity-0"}`}
       />
-      <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-xs backdrop-blur">
-        {participant.imageUrl && (
-          <Image src={participant.imageUrl} alt={participant.name} width={20} height={20} unoptimized className="h-5 w-5 rounded-full" />
+      <div className="absolute bottom-3 left-3 right-3 flex min-w-0 items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-xs backdrop-blur">
+        {participant.imageUrl && !imageFailed ? (
+          <Image src={participant.imageUrl} alt="" width={20} height={20} unoptimized onError={() => setImageFailed(true)} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+        ) : (
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#5865f2] text-[10px] font-semibold">
+            {participant.name.charAt(0).toUpperCase()}
+          </span>
         )}
-        <span>{participant.name}</span>
+        <span className="truncate">{participant.name}</span>
       </div>
       {!hasVideo && (
         <div className="absolute inset-0 flex items-center justify-center">
-          {participant.imageUrl ? (
-            <Image src={participant.imageUrl} alt={participant.name} width={72} height={72} unoptimized className="h-16 w-16 rounded-full ring-4 ring-[#5865f2]/30" />
+          {participant.imageUrl && !imageFailed ? (
+            <Image src={participant.imageUrl} alt={participant.name} width={72} height={72} unoptimized onError={() => setImageFailed(true)} className="h-16 w-16 rounded-full object-cover ring-4 ring-[#5865f2]/30" />
           ) : (
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#5865f2] text-xl font-semibold ring-4 ring-[#5865f2]/30">
               {participant.name.charAt(0).toUpperCase()}
@@ -132,6 +142,7 @@ export const CallRoom = ({
   roomId,
   video,
   currentParticipant,
+  participants,
 }: {
   roomId: string;
   video: boolean;
@@ -242,6 +253,53 @@ export const CallRoom = ({
   // Leave when the component unmounts.
   useEffect(() => () => cleanup(true), [cleanup]);
 
+  // Subscribe to SFU room presence before media is started. This keeps the
+  // room preview useful: users can see who is already in the call before they
+  // grant microphone/camera access or press Join.
+  useEffect(() => {
+    let disposed = false;
+    let poll: number | null = null;
+    const endpoint = process.env.NEXT_PUBLIC_MEDIASOUP_URL ?? "ws://localhost:3333";
+    const previewSocket = io(endpoint, {
+      autoConnect: false,
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      timeout: 10000,
+    });
+    const onPresence = (members: Participant[]) => {
+      if (!disposed) setPresent(mergeParticipants(members));
+    };
+    previewSocket.on("call-presence", onPresence);
+    socketRef.current = previewSocket;
+
+    void new Promise<void>((resolve, reject) => {
+      previewSocket.once("connect", () => resolve());
+      previewSocket.once("connect_error", reject);
+      previewSocket.connect();
+    }).then(async () => {
+      const refresh = async () => {
+        try {
+          const members = await request<Participant[]>(previewSocket, "call:presence", { roomId });
+          if (!disposed) setPresent(mergeParticipants(members));
+        } catch {
+          // The preview is best-effort until the user joins the call.
+        }
+      };
+      await refresh();
+      poll = window.setInterval(() => void refresh(), 2000);
+    }).catch(() => {
+      if (!disposed) previewSocket.disconnect();
+    });
+
+    return () => {
+      disposed = true;
+      if (poll) window.clearInterval(poll);
+      previewSocket.off("call-presence", onPresence);
+      previewSocket.disconnect();
+      if (socketRef.current === previewSocket) socketRef.current = null;
+    };
+  }, [currentParticipant, roomId]);
+
   const consumeProducer = useCallback(
     async (producerId: string, socketId: string) => {
       const sock = socketRef.current;
@@ -290,24 +348,27 @@ export const CallRoom = ({
 
     try {
       const endpoint = process.env.NEXT_PUBLIC_MEDIASOUP_URL ?? "ws://localhost:3333";
-      const sock = io(endpoint, {
-        autoConnect: false,
-        transports: ["websocket", "polling"],
-        reconnection: false,
-        timeout: 10000,
-      });
-      await new Promise<void>((resolve, reject) => {
-        const timer = window.setTimeout(() => reject(new Error("SFU connection timed out")), 10000);
-        sock.once("connect", () => {
-          window.clearTimeout(timer);
-          resolve();
+      let sock = socketRef.current;
+      if (!sock) {
+        sock = io(endpoint, {
+          autoConnect: false,
+          transports: ["websocket", "polling"],
+          reconnection: false,
+          timeout: 10000,
         });
-        sock.once("connect_error", (error) => {
-          window.clearTimeout(timer);
-          reject(error);
+        await new Promise<void>((resolve, reject) => {
+          const timer = window.setTimeout(() => reject(new Error("SFU connection timed out")), 10000);
+          sock!.once("connect", () => {
+            window.clearTimeout(timer);
+            resolve();
+          });
+          sock!.once("connect_error", (error) => {
+            window.clearTimeout(timer);
+            reject(error);
+          });
+          sock!.connect();
         });
-        sock.connect();
-      });
+      }
       socketRef.current = sock;
       const media = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -319,6 +380,7 @@ export const CallRoom = ({
 
       // Register listeners BEFORE joining so no event is missed.
       const self = normalizeParticipant({ ...currentParticipant, socketId: `local:${currentParticipant.id}` });
+      sock.off("call-presence");
       listenersRef.current = {
         onNewProducer: ({ producerId, socketId }) => void consumeProducer(producerId, socketId),
         onProducerClosed: ({ producerId }) => removeRemoteTrack(producerId),
@@ -392,7 +454,10 @@ export const CallRoom = ({
 
   // Attach the local stream once the <video> element exists (it only renders while active).
   useEffect(() => {
-    if (active && localVideo.current) localVideo.current.srcObject = localStream.current;
+    if (active && localVideo.current && localStream.current) {
+      localVideo.current.srcObject = localStream.current;
+      void localVideo.current.play().catch(() => undefined);
+    }
   }, [active, camera]);
 
   // Real speaking detection from the mic level.
@@ -474,6 +539,7 @@ export const CallRoom = ({
   const qualityColor =
     connectionQuality === "excellent" || connectionQuality === "good" ? "#23a559" : connectionQuality === "fair" ? "#f0b232" : "#f04142";
   const remoteParticipants = present.filter((p) => !p.socketId.startsWith("local:"));
+  const availableMembers = participants.filter((member) => member.id !== currentParticipant.id);
   const showLocalAvatar = !video || !camera;
 
   return (
@@ -510,7 +576,7 @@ export const CallRoom = ({
 
       {/* Main content */}
       <div className="relative flex flex-1 flex-col items-center justify-center gap-6 overflow-auto p-6">
-        <div className="w-full max-w-5xl rounded-2xl border border-white/5 bg-[#2b2d31]/90 p-6 shadow-2xl">
+        <div className="w-full max-w-6xl rounded-2xl border border-white/5 bg-[#2b2d31]/90 p-6 shadow-2xl">
           <div className="mb-5 flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">In this call</p>
@@ -537,10 +603,10 @@ export const CallRoom = ({
             )}
           </div>
 
-          <div className={`grid gap-4 ${video ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
+          <div className={`grid gap-4 ${video ? "grid-cols-[repeat(auto-fit,minmax(260px,1fr))]" : "grid-cols-1"}`}>
             {/* Local video */}
             {active ? (
-              <div className={`relative overflow-hidden rounded-xl border bg-[#111214] ${speaking && !muted ? "border-[#23a559]" : "border-white/5"}`}>
+              <div className={`relative min-h-40 overflow-hidden rounded-xl border bg-[#111214] ${speaking && !muted ? "border-[#23a559]" : "border-white/5"}`}>
                 <video
                   ref={localVideo}
                   autoPlay
@@ -559,13 +625,55 @@ export const CallRoom = ({
                     className="absolute inset-0 m-auto h-20 w-20 rounded-full ring-4 ring-[#5865f2]/30"
                   />
                 )}
-                <span className="absolute bottom-3 left-3 rounded-full bg-black/60 px-3 py-1.5 text-xs">
+                  <span className="absolute bottom-3 left-3 right-3 truncate rounded-full bg-black/60 px-3 py-1.5 text-xs">
                   {currentParticipant.name} (You){muted ? " · muted" : ""}
                 </span>
               </div>
             ) : (
               <div className="flex min-h-32 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#404249] bg-[#111214]">
-                <p className="text-sm text-[#949ba4]">You are not in this call.</p>
+                {remoteParticipants.length > 0 ? (
+                  <>
+                    <div className="flex -space-x-2">
+                      {remoteParticipants.slice(0, MAX_VISIBLE_AVATARS).map((member) => (
+                        <div key={member.socketId} className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-[#111214] bg-[#5865f2] ring-2 ring-[#111214]">
+                          {member.imageUrl ? (
+                            <Image src={member.imageUrl} alt={member.name} title={member.name} width={40} height={40} unoptimized className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="text-sm font-semibold text-white">{member.name.charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                      ))}
+                      {remoteParticipants.length > MAX_VISIBLE_AVATARS && (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#111214] bg-[#2b2d31] text-xs text-[#b5bac1]">
+                          +{remoteParticipants.length - MAX_VISIBLE_AVATARS}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-sm text-[#949ba4]">
+                      {remoteParticipants.length} {remoteParticipants.length === 1 ? "person is" : "people are"} in this call
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-[#dbdee1]">No one is in this call yet.</p>
+                    {availableMembers.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <div className="flex -space-x-2">
+                          {availableMembers.slice(0, MAX_VISIBLE_AVATARS).map((member) => (
+                            <div key={member.id} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border-2 border-[#111214] bg-[#5865f2]">
+                              {member.imageUrl ? (
+                                <Image src={member.imageUrl} alt={member.name} title={member.name} width={32} height={32} unoptimized className="h-full w-full object-cover" />
+                              ) : (
+                                <span className="text-xs font-semibold text-white">{member.name.charAt(0).toUpperCase()}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <span className="text-xs text-[#949ba4]">{availableMembers.length} member{availableMembers.length === 1 ? "" : "s"} can join</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 

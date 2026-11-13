@@ -33,6 +33,7 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sendError, setSendError] = useState<string | null>(null);
   const { socket, isConnected } = useSocket();
   const searchParams = useSearchParams();
 
@@ -85,11 +86,16 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
 
   const send = async () => {
     if (!selected || !content.trim()) return;
-    await fetch(`/api/conversations/${selected}/messages`, {
+    setSendError(null);
+    const sendResponse = await fetch(`/api/conversations/${selected}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
     });
+    if (!sendResponse.ok) {
+      setSendError(await sendResponse.text());
+      return;
+    }
     setContent("");
     const response = await fetch(`/api/conversations/${selected}/messages`);
     setMessages(await response.json());
@@ -223,8 +229,7 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
             )}
         </div>
 
-        {selected && (
-          <form
+        <form
             className="flex shrink-0 gap-2 border-t border-[#1f2023] bg-[#1e1f22] p-4"
             onSubmit={(event) => {
               event.preventDefault();
@@ -234,17 +239,19 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
             <Input
               value={content}
               onChange={(event) => setContent(event.target.value)}
-              placeholder="Message"
+              placeholder={selected ? "Message" : "Select a conversation to message"}
+              disabled={!selected}
               className="h-11 rounded-xl border-0 bg-[#383a40] text-white placeholder:text-[#949ba4] focus-visible:ring-1 focus-visible:ring-[#5865f2]"
             />
             <Button
               type="submit"
+              disabled={!selected || !content.trim()}
               className="h-11 rounded-xl bg-[#5865f2] hover:bg-[#4752c4] transition-colors"
             >
               Send
             </Button>
           </form>
-        )}
+        {sendError && <p className="px-4 pb-2 text-sm text-[#f23f42]" role="alert">{sendError}</p>}
       </main>
     </div>
   );

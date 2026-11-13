@@ -4,9 +4,6 @@ import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { MemberRole } from "@/generated/prisma/enums";
 
-const DEFAULT_SERVER_IMAGE =
-  "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80";
-
 export async function POST(req: Request) {
   try {
     const { name, imageUrl } = await req.json();
@@ -16,11 +13,19 @@ export async function POST(req: Request) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    if (typeof name !== "string" || !name.trim()) {
+      return new NextResponse("Server name is required", { status: 400 });
+    }
+
+    if (typeof imageUrl !== "string" || !imageUrl.trim()) {
+      return new NextResponse("Upload a server image before creating the server", { status: 400 });
+    }
+
     const server = await db.server.create({
       data: {
         profileId: profile.id,
-        name,
-        imageURL: typeof imageUrl === "string" && imageUrl.trim().length > 0 ? imageUrl : DEFAULT_SERVER_IMAGE,
+        name: name.trim(),
+        imageURL: imageUrl.trim(),
         inviteCode: uuidv4(),
         channels: {
           create: [{ name: "general", profileId: profile.id }],

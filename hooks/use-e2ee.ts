@@ -21,7 +21,8 @@ import {
   SignedPreKeyPair,
   OneTimePreKeyPair,
 } from "@/lib/e2ee";
-import { keyStorage, bundleStorage, sessionManager } from "@/lib/e2ee";
+import { decryptGroupMessage, encryptGroupMessage } from "@/lib/e2ee/group";
+import { keyStorage, bundleStorage, sessionManager, sessionStorage, type SessionData } from "@/lib/e2ee";
 
 interface E2EEState {
   initialized: boolean;
@@ -35,6 +36,9 @@ interface UseE2EEReturn extends E2EEState {
   initializeE2EE: () => Promise<void>;
   uploadKeyBundle: () => Promise<boolean>;
   getPeerBundle: (userId: string) => Promise<KeyBundle | null>;
+  getLocalBundle: () => Promise<KeyBundle | null>;
+  encryptGroupMessage: (recipientIds: string[], plaintext: string, localProfileId?: string) => Promise<string | null>;
+  decryptGroupMessage: (recipientId: string, payload: string) => Promise<string | null>;
   
   // Session management
   establishSession: (peerId: string) => Promise<boolean>;
@@ -70,23 +74,29 @@ export function useE2EE(): UseE2EEReturn {
       const storedIdentity = await keyStorage.getKey("identity");
       const storedSignedPreKey = await keyStorage.getKey("signed-pre-key");
 
-      if (storedIdentity && storedSignedPreKey) {
+      if (storedIdentity) {
         const identity = storedIdentity as IdentityKeyPair;
-        const signedPreKey = storedSignedPreKey as SignedPreKeyPair;
-
-        if (identity.publicKey && identity.privateKey && signedPreKey.publicKey && signedPreKey.privateKey) {
+        if (identity.publicKey?.length === 32 && identity.privateKey?.length === 32) {
           identityKeyRef.current = identity;
-          signedPreKeyRef.current = signedPreKey;
-          oneTimePreKeysRef.current = (await generateOneTimePreKeys(100)) ?? [];
 
+          const storedPreKey = storedSignedPreKey as SignedPreKeyPair | null;
+          if (
+            storedPreKey?.publicKey?.length === 32 &&
+            storedPreKey.privateKey?.length === 32 &&
+            storedPreKey.signature?.length === 64
+          ) {
+            signedPreKeyRef.current = storedPreKey;
+          } else {
+            // Preserve the durable identity. Only repair the disposable
+            // signed pre-key when an older/incomplete record is found.
+            signedPreKeyRef.current = await generateSignedPreKey(identity);
+            await keyStorage.storeKey("signed-pre-key", signedPreKeyRef.current);
+          }
+
+          oneTimePreKeysRef.current = (await generateOneTimePreKeys(100)) ?? [];
           await sessionManager.initialize(identityKeyRef.current, "local");
 
-          setState({
-            initialized: true,
-            hasKeyBundle: true,
-            isLoading: false,
-            error: null,
-          });
+          setState({ initialized: true, hasKeyBundle: true, isLoading: false, error: null });
           return;
         }
       }
@@ -138,6 +148,10 @@ export function useE2EE(): UseE2EEReturn {
         oneTimePreKey
       );
 
+      if (!bundle.signedPreKeySignature) {
+        throw new Error("Signed pre-key signature is missing; regenerate E2EE keys");
+      }
+
       const response = await fetch("/api/keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -183,19 +197,53 @@ export function useE2EE(): UseE2EEReturn {
       await bundleStorage.saveBundle(userId, JSON.stringify(data));
 
       return deserializeKeyBundle(JSON.stringify(data));
-    } catch (error) {
-      console.error("[useE2EE] Fetch bundle error:", error);
+    } catch {
+      // A missing/offline peer is expected in a group. The caller retries with
+      // backoff; do not flood the console or expose transport details in UI.
       return null;
     }
+  }, []);
+
+  const getLocalBundle = useCallback(async (): Promise<KeyBundle | null> => {
+    if (!identityKeyRef.current || !signedPreKeyRef.current) return null;
+    return createKeyBundle(
+      identityKeyRef.current,
+      signedPreKeyRef.current,
+      oneTimePreKeysRef.current[0] ?? null,
+    );
+  }, []);
+
+  const encryptGroupPayload = useCallback(async (recipientIds: string[], plaintext: string, localProfileId?: string): Promise<string | null> => {
+    if (!identityKeyRef.current) return null;
+    const recipients = [];
+    for (const userId of [...new Set(recipientIds)]) {
+      const bundle = userId === localProfileId
+        ? await getLocalBundle()
+        : await getPeerBundle(userId);
+      // Never publish a partial group envelope. A member without a published
+      // key would receive the message but could never decrypt it.
+      if (!bundle) return null;
+      recipients.push({ userId, identityKey: bundle.identityKey });
+    }
+    try {
+      return await encryptGroupMessage(localProfileId ?? "local", plaintext, recipients);
+    } catch {
+      return null;
+    }
+  }, [getLocalBundle, getPeerBundle]);
+
+  const decryptGroupPayload = useCallback(async (recipientId: string, payload: string): Promise<string | null> => {
+    if (!identityKeyRef.current) return null;
+    return decryptGroupMessage(payload, recipientId, identityKeyRef.current.privateKey);
   }, []);
 
   /**
    * Establish encrypted session with a peer
    */
-  const establishSession = useCallback(async (peerId: string): Promise<boolean> => {
+  const establishSession = useCallback(async (peerId: string, localBundle?: KeyBundle | null): Promise<boolean> => {
     try {
       // Get peer's key bundle
-      const peerBundle = await getPeerBundle(peerId);
+      const peerBundle = localBundle ?? await getPeerBundle(peerId);
       
       if (!peerBundle) {
         setState((prev) => ({ ...prev, error: "Peer has no key bundle" }));
@@ -251,8 +299,8 @@ export function useE2EE(): UseE2EEReturn {
         
         const decoder = new TextDecoder();
         return decoder.decode(plaintextBytes);
-      } catch (error) {
-        console.error("[useE2EE] Decryption error:", error);
+      } catch {
+        // Missing sessions and stale ciphertext are handled by the chat UI.
         return null;
       }
     },
@@ -283,6 +331,10 @@ export function useE2EE(): UseE2EEReturn {
           type: "X25519",
         }));
 
+        const sessions = typeof sessionStorage.getAllSessions === "function"
+          ? await sessionStorage.getAllSessions()
+          : [];
+
         // Encrypt with password
         const passwordEncoder = new TextEncoder();
         const passwordBytes = passwordEncoder.encode(password);
@@ -310,7 +362,11 @@ export function useE2EE(): UseE2EEReturn {
         );
 
         const iv = crypto.getRandomValues(new Uint8Array(12));
-        const keyData = new TextEncoder().encode(JSON.stringify(exportableKeys));
+        const keyData = new TextEncoder().encode(JSON.stringify({
+          version: 2,
+          keys: exportableKeys,
+          sessions,
+        }));
 
         const encrypted = await crypto.subtle.encrypt(
           { name: "AES-GCM", iv },
@@ -372,7 +428,10 @@ export function useE2EE(): UseE2EEReturn {
           encrypted
         );
 
-        const keys = JSON.parse(new TextDecoder().decode(decrypted));
+        const imported = JSON.parse(new TextDecoder().decode(decrypted)) as
+          | { version?: number; keys?: unknown[]; sessions?: SessionData[] }
+          | unknown[];
+        const keys = Array.isArray(imported) ? imported : imported.keys ?? [];
 
         for (const keyData of keys) {
           const rawKey = keyData.key as { publicKey?: number[]; privateKey?: number[]; signingPublicKey?: number[]; signingPrivateKey?: number[] };
@@ -384,6 +443,14 @@ export function useE2EE(): UseE2EEReturn {
             signingPublicKey: rawKey.signingPublicKey ? new Uint8Array(rawKey.signingPublicKey) : undefined,
             signingPrivateKey: rawKey.signingPrivateKey ? new Uint8Array(rawKey.signingPrivateKey) : undefined,
           });
+        }
+
+        if (!Array.isArray(imported) && imported.sessions) {
+          for (const session of imported.sessions) {
+            if (session?.sessionId && session.peerId && session.state) {
+              await sessionStorage.saveSession(session);
+            }
+          }
         }
 
         await initializeE2EE();
@@ -417,6 +484,9 @@ export function useE2EE(): UseE2EEReturn {
     initializeE2EE,
     uploadKeyBundle,
     getPeerBundle,
+    getLocalBundle,
+    encryptGroupMessage: encryptGroupPayload,
+    decryptGroupMessage: decryptGroupPayload,
     establishSession,
     encryptMessage,
     decryptMessage,

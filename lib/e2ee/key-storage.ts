@@ -271,6 +271,16 @@ export class SessionStorage {
       request.onerror = () => reject(request.error);
     });
   }
+
+  async getAllSessions(): Promise<SessionData[]> {
+    const db = await this.db;
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction("sessions", "readonly");
+      const request = transaction.objectStore("sessions").getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
   
   async deleteSession(sessionId: string): Promise<void> {
     const db = await this.db;

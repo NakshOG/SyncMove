@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Headphones, Mic, MicOff, Settings, VolumeX } from "lucide-react";
 import { useState } from "react";
+import { useE2EEContext } from "@/components/providers/e2ee-provider";
 
 export const UserControls = ({
   imageUrl,
@@ -16,6 +17,9 @@ export const UserControls = ({
   const [muted, setMuted] = useState(false);
   const [deafened, setDeafened] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [backupPassword, setBackupPassword] = useState("");
+  const [backupStatus, setBackupStatus] = useState<string | null>(null);
+  const { initialized, exportKeys, importKeys } = useE2EEContext();
 
   const publishAudioState = (nextMuted: boolean, nextDeafened: boolean) => {
     window.dispatchEvent(new CustomEvent("syncmove:audio-controls", { detail: { muted: nextMuted, deafened: nextDeafened } }));
@@ -31,6 +35,36 @@ export const UserControls = ({
     const nextDeafened = !deafened;
     setDeafened(nextDeafened);
     publishAudioState(nextDeafened ? true : muted, nextDeafened);
+  };
+
+  const downloadKeyBackup = async () => {
+    if (!backupPassword) {
+      setBackupStatus("Enter a backup password first.");
+      return;
+    }
+    const backup = await exportKeys(backupPassword);
+    if (!backup) {
+      setBackupStatus("Unable to create key backup.");
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([backup], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "syncmove-e2ee-key-backup.json";
+    link.click();
+    URL.revokeObjectURL(url);
+    setBackupStatus("Encrypted backup downloaded.");
+  };
+
+  const restoreKeyBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !backupPassword) {
+      setBackupStatus("Choose a backup and enter its password.");
+      return;
+    }
+    const success = await importKeys(backupPassword, await file.text());
+    setBackupStatus(success ? "Keys restored. Refresh to reconnect securely." : "Unable to restore this backup.");
   };
 
   return (
@@ -77,6 +111,29 @@ export const UserControls = ({
           <div className="space-y-1">
             <p className="text-[#949ba4]">Microphone: <span className={muted ? "text-[#f23f42]" : "text-[#23a559]"}>{muted ? "muted" : "active"}</span></p>
             <p className="text-[#949ba4]">Audio output: <span className={deafened ? "text-[#f23f42]" : "text-[#23a559]"}>{deafened ? "deafened" : "active"}</span></p>
+          </div>
+          <div className="mt-4 border-t border-white/10 pt-3">
+            <p className="font-semibold text-white">Encryption keys</p>
+            <p className="mt-1 text-[10px] text-[#949ba4]">
+              {initialized ? "Stored on this device" : "Initializing..."}. The server never receives private keys.
+            </p>
+            <input
+              type="password"
+              value={backupPassword}
+              onChange={(event) => setBackupPassword(event.target.value)}
+              placeholder="Backup password"
+              className="mt-2 w-full rounded bg-[#2b2d31] px-2 py-1.5 text-xs text-white outline-none ring-[#5865f2] placeholder:text-[#949ba4] focus:ring-1"
+            />
+            <div className="mt-2 flex gap-1">
+              <button type="button" onClick={() => void downloadKeyBackup()} className="flex-1 rounded bg-[#5865f2] px-2 py-1.5 text-[10px] text-white hover:bg-[#4752c4]">
+                Export backup
+              </button>
+              <label className="flex-1 cursor-pointer rounded bg-[#35373c] px-2 py-1.5 text-center text-[10px] text-white hover:bg-[#404249]">
+                Import backup
+                <input type="file" accept="application/json,.json" onChange={(event) => void restoreKeyBackup(event)} className="hidden" />
+              </label>
+            </div>
+            {backupStatus && <p className="mt-2 text-[10px] text-[#a5b4fc]">{backupStatus}</p>}
           </div>
         </div>
       )}

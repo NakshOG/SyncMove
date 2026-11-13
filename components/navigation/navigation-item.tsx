@@ -7,6 +7,8 @@ import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 import { ActionTooltip } from "@/components/action-tooltip";
+import { Server } from "lucide-react";
+import { useState } from "react";
 
 interface NavigationItemProps {
   id: string;
@@ -17,6 +19,7 @@ interface NavigationItemProps {
 export const NavigationItem = ({ id, imageUrl, name }: NavigationItemProps) => {
   const params = useParams();
   const router = useRouter();
+  const [imageFailed, setImageFailed] = useState(false);
 
   return (
     <ActionTooltip side="right" align="center" label={name}>
@@ -37,13 +40,20 @@ export const NavigationItem = ({ id, imageUrl, name }: NavigationItemProps) => {
             "relative mx-3 flex h-12 w-12 overflow-hidden rounded-xl bg-[#313338] transition-all group-hover:rounded-xl",
           )}
         >
-          <Image
-            fill
-            src={imageUrl}
-            alt={name}
-            sizes="48px"
-            className="object-cover"
-          />
+          {imageUrl && !imageFailed ? (
+            <Image
+              fill
+              src={imageUrl}
+              alt={name}
+              sizes="48px"
+              className="object-cover"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-[#5865f2]" aria-label={`${name} server icon`}>
+              <Server className="h-5 w-5 text-white" />
+            </div>
+          )}
         </div>
       </div>
     </ActionTooltip>

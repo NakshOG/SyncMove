@@ -54,6 +54,30 @@ Keys are generated locally on each device and **never** transmitted to the serve
 | One-Time Pre-Keys (OPKs) | Single-use keys for initial handshake | Server (public), Device (none) |
 | Ephemeral Keys | Per-session keys | Local memory only |
 
+#### Durable key lifecycle
+
+The identity private key is the durable device identity and is persisted only
+in the browser's IndexedDB key store. Refreshes, browser restarts, and long
+offline periods must reuse that identity; generating a new identity on every
+session would make old encrypted history unrecoverable.
+
+The signed pre-key may be rotated, while the identity key remains stable. A
+new browser or a browser whose site data was cleared cannot recover history
+from the server alone. Users must restore an encrypted key backup created on
+the original device. The backup is protected locally with a password-derived
+AES-GCM key; the password and private keys are never sent to SyncMove.
+
+Key-management requirements:
+
+1. Persist identity and signed-pre-key material locally before publishing the
+   public bundle.
+2. Publish only public identity/SPK/OPK material to the server.
+3. Offer encrypted export/import for device transfer and site-data recovery.
+4. Never silently replace an existing identity key because a peer bundle is
+   missing or a request fails.
+5. Treat identity replacement as a new device: old history remains available
+   only on devices that still hold the previous private key.
+
 ### 2. X3DH Key Exchange
 
 Initial handshake uses Extended Triple Diffie-Hellman to establish shared secret:
@@ -184,3 +208,16 @@ This implementation follows:
 *Document created: November 2026*
 *Architecture version: 1.0*
 *Based on Signal Protocol v3.0+ specifications*
+
+## SyncMove implementation status
+
+The application preserves the long-term identity key in IndexedDB and repairs
+only disposable signed pre-keys. Group messages and encrypted file keys use a
+versioned per-recipient X25519/AES-GCM envelope so messages remain decryptable
+after a browser refresh without requiring both users to complete a new online
+handshake. Session state is included in the password-protected local backup.
+
+This document describes the security target and lifecycle policy. It does not
+claim wire compatibility with WhatsApp or Signal. A production deployment
+should receive an independent cryptographic review before making guarantees
+beyond the tested local implementation.

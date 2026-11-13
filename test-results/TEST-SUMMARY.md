@@ -12,7 +12,7 @@ All 72 tests passed. The multi-node architecture is fully functional with:
 - ✅ NGINX load balancing between 2 app nodes
 - ✅ Primary/MariaDB replica database configuration
 - ✅ Redis pub/sub for real-time coordination
-- ✅ Mediasoup SFU media relay (no TURN server needed)
+- ✅ Mediasoup SFU media relay (no P2P/STUN/TURN path)
 - ✅ Database failover mechanism
 - ✅ End-to-end encryption (X3DH + AES-GCM)
 - ✅ WebRTC media with DTLS-SRTP transport encryption
@@ -162,17 +162,17 @@ npm run test:watch
 
 ### Build
 ```bash
-docker-compose -f docker-compose.multi.yml build
+docker compose -f docker-compose.sfu.yml build
 ```
 
 ### Start
 ```bash
-docker-compose -f docker-compose.multi.yml up -d
+docker compose -f docker-compose.sfu.yml up -d
 ```
 
 ### Stop
 ```bash
-docker-compose -f docker-compose.multi.yml down
+docker compose -f docker-compose.sfu.yml down
 ```
 
 ---
@@ -194,6 +194,11 @@ User → NGINX (Port 80) → [App Node 1:3001, App Node 2:3002]
 ```
 
 ---
+
+## Current verification note
+
+The current run passed 72/72 Vitest tests and the production build. Full lint
+still reports four `no-explicit-any` errors in stress-test fixtures.
 
 ## Conclusion
 

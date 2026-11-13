@@ -36,7 +36,7 @@ export const MemberList = ({
   currentProfileId: string;
 }) => {
   const router = useRouter();
-  const { socket } = useSocket();
+  const { socket, isAuthenticated } = useSocket();
   const [onlineProfiles, setOnlineProfiles] = useState<string[]>([
     currentProfileId,
   ]);
@@ -46,7 +46,7 @@ export const MemberList = ({
     currentRole === MemberRole.ADMIN || currentRole === MemberRole.MODERATOR;
 
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !isAuthenticated) return;
     const refreshMembers = () => router.refresh();
     const receivePresence = (profileIds: string[]) =>
       setOnlineProfiles(profileIds);
@@ -62,7 +62,7 @@ export const MemberList = ({
       socket.off("server-presence", receivePresence);
       clearTimeout(timer);
     };
-  }, [currentProfileId, router, serverId, socket]);
+  }, [currentProfileId, isAuthenticated, router, serverId, socket]);
 
   const updateRole = async (memberId: string, role: MemberRole) => {
     if (updatingMemberId) return;
@@ -140,17 +140,23 @@ export const MemberList = ({
         {members.map((member) => (
           <div
             key={member.id}
-            className="group flex items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-[#35373c]"
+            className="group relative flex items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-[#35373c]"
           >
             <div className="relative shrink-0">
-              <Image
-                src={member.profile.imageUrl}
-                alt={member.profile.name}
-                width={32}
-                height={32}
-                unoptimized
-                className="h-8 w-8 rounded-full"
-              />
+              {member.profile.imageUrl ? (
+                <Image
+                  src={member.profile.imageUrl}
+                  alt={member.profile.name}
+                  width={32}
+                  height={32}
+                  unoptimized
+                  className="h-8 w-8 rounded-full object-cover"
+                />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5865f2] text-xs font-semibold text-white">
+                  {member.profile.name.charAt(0).toUpperCase()}
+                </div>
+              )}
               <span
                 className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#2b2d31] ${
                   onlineProfiles.includes(member.profileId)
@@ -190,15 +196,17 @@ export const MemberList = ({
                   render={
                     <button
                       type="button"
-                      className="hidden size-6 items-center justify-center rounded-md text-[#b5bac1] transition group-hover:inline-flex hover:bg-[#35373c] hover:text-white"
+                      className="pointer-events-none inline-flex size-6 items-center justify-center rounded-md text-[#b5bac1] opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[#35373c] hover:text-white"
                     >
                       <span className="text-sm">...</span>
                     </button>
                   }
                 />
                 <DropdownMenuContent
-                  align="end"
-                  className="bg-[#2b2d31] border-[#1f2023]"
+                  side="left"
+                  align="start"
+                  sideOffset={8}
+                  className="w-auto min-w-44 border-[#1f2023] bg-[#2b2d31]"
                 >
                   <DropdownMenuItem
                     disabled={updatingMemberId === member.id}

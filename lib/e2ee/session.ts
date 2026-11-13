@@ -20,6 +20,7 @@ import {
   decryptMessage,
   serializeState,
   deserializeState,
+  establishSendingChain,
   DoubleRatchetState,
   EncryptedMessage,
   MessageHeader,
@@ -96,6 +97,11 @@ export class SessionManager {
     const existing = await sessionStorage.getSessionsByPeer(peerId);
     const activeSession = existing.find(s => s.status !== "closed");
     if (activeSession) {
+      if (activeSession.status === "pending") {
+        activeSession.status = "established";
+        activeSession.updated = Date.now();
+        await this.saveSession(activeSession);
+      }
       return this.loadSessionState(activeSession);
     }
     
@@ -112,12 +118,17 @@ export class SessionManager {
       initialMessage.ephemeralKey,
       peerBundle.identityKey
     );
+    await establishSendingChain(state);
     
     const session: E2EESession = {
       sessionId: crypto.randomUUID(),
       peerId,
       peerIdentityKey: peerBundle.identityKey,
-      status: "pending",
+      // The initial X3DH state is usable immediately by this client. The
+      // previous pending status made encryptForPeer reject every first
+      // message because there is currently no network handshake consumer that
+      // promotes the session later.
+      status: "established",
       created: Date.now(),
       updated: Date.now(),
       lastMessageNr: 0,
@@ -173,6 +184,7 @@ export class SessionManager {
       this.mySignedPreKey?.publicKey ?? this.myIdentityKey.publicKey,
       initialMessage.ephemeralKey
     );
+    await establishSendingChain(state);
     
     const session: E2EESession = {
       sessionId: crypto.randomUUID(),
@@ -205,6 +217,13 @@ export class SessionManager {
     }
     
     const sessionData = await this.loadSessionState(session);
+
+    // Repair sessions created by older builds. They were marked established
+    // but had no sending chain, which caused the first group message to fail.
+    if (sessionData.state && (sessionData.state.bootstrapChainVersion !== 2 || !sessionData.state.sendingChainKey)) {
+      await establishSendingChain(sessionData.state);
+      await this.saveSession(sessionData);
+    }
     
     if (!sessionData.state) {
       throw new Error("Session state not available");

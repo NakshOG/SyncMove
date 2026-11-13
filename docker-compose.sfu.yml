@@ -9,12 +9,12 @@ services:
     command: ["node", "--import", "tsx", "mediasoup-server.ts"]
     ports:
       - "3333:3333"
-      - "40000-40100:40000-40100/udp"
+      - "40000-40099:40000-40099/udp"
     environment:
       - MEDIASOUP_ANNOUNCED_IP=${MEDIASOUP_ANNOUNCED_IP:-localhost}
       - MEDIASOUP_PORT=3333
       - MEDIASOUP_RTC_MIN_PORT=40000
-      - MEDIASOUP_RTC_MAX_PORT=40500
+      - MEDIASOUP_RTC_MAX_PORT=40099
     networks:
       - syncmove-network
     restart: unless-stopped
@@ -174,11 +174,12 @@ services:
       mediasoup-sfu:
         condition: service_healthy
     ports:
+      - "3000:3000"
       - "3001:3000"
     networks:
       - syncmove-network
     restart: unless-stopped
-    command: sh -c "npx prisma migrate deploy && npx prisma generate && npm run start"
+    command: 'sh -c "npx prisma db push && npx prisma generate && npm run start"'
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 10s

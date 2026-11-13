@@ -85,10 +85,31 @@ npx prisma db push
 npm run dev
 ```
 
+### Local Docker stack (NGINX + two app nodes + SFU)
+
+The recommended local runtime is the SFU Compose stack. It starts NGINX, two
+Next.js app nodes, MariaDB primary/replica containers, the failover helper,
+Redis, and the Mediasoup SFU:
+
+```bash
+docker compose -f docker-compose.sfu.yml up -d --build
+```
+
+The first app node runs `prisma db push` during container startup so a fresh
+local database is usable even though this prototype does not ship migration
+files. It does not reset the database.
+
+Open:
+
+- http://localhost/ (NGINX load balancer)
+- http://localhost:3000/ (app node 1 direct)
+- http://localhost:3001/ (app node 1 compatibility alias)
+- http://localhost:3002/ (app node 2 direct)
+
 ### SFU media setup
 
 The supported call path is Mediasoup SFU-only. Docker Compose exposes signaling on
-`localhost:3333` and UDP media ports `49152-65535`. The browser uses
+`localhost:3333` and UDP media ports `40000-40099` by default. The browser uses
 `NEXT_PUBLIC_MEDIASOUP_URL=ws://localhost:3333`; it must not use the internal
 Docker hostname `mediasoup-sfu`.
 
@@ -167,12 +188,13 @@ For a local multi-node prototype with NGINX, Redis, and a MariaDB primary/replic
 ```bash
 cp .env.multi.example .env
 
-docker compose -f docker-compose.multi.yml up -d --build
+docker compose -f docker-compose.sfu.yml up -d --build
 ```
 
 Then open:
 
 - http://localhost/ (NGINX load balancer)
+- http://localhost:3000/ (node 1 direct)
 - http://localhost:3001/ (node 1 direct)
 - http://localhost:3002/ (node 2 direct)
 
@@ -203,3 +225,15 @@ In other words, the prototype is intentionally simple and honest: it demonstrate
 ## License
 
 MIT
+
+## Current verification
+
+Run `npm test`, `npm run lint`, and `npm run build` for local validation. The
+latest run passed all 72 Vitest tests and the production build. Full lint still
+reports four existing `no-explicit-any` errors in stress-test fixtures.
+
+The supported SFU stack is `docker-compose.sfu.yml` with Mediasoup UDP ports
+`40000-40099`. Calls are SFU-only: no P2P, public STUN, TURN, or Coturn path.
+Private E2EE identity keys and sessions are stored in IndexedDB; export a
+password-protected backup from User Controls before clearing site data or
+moving to another device.

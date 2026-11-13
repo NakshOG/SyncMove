@@ -39,10 +39,11 @@ export const ChatMessages = ({
   const [searchResults, setSearchResults] = useState<ChatMessage[]>([]);
   const [showPinned, setShowPinned] = useState(false);
   const [decryptedCache] = useState<Map<string, string>>(new Map());
+  const [decryptedContents, setDecryptedContents] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [memberIds, setMemberIds] = useState<string[]>([]);
 
-  const { socket, isConnected } = useSocket();
+  const { socket, isConnected, isAuthenticated } = useSocket();
   const { decryptFromChannel, initialized, establishChannelSession } = useE2EEContext();
 
   const load = useCallback(
@@ -83,22 +84,43 @@ export const ChatMessages = ({
       }
 
       try {
-        const decrypted = await decryptFromChannel(channelId, message.content);
-        const finalContent = decrypted ?? message.content;
+        const decrypted = await decryptFromChannel(channelId, message.content, profileId);
+        const finalContent = decrypted ?? "Unable to decrypt this message";
         decryptedCache.set(message.id, finalContent);
         return finalContent;
-      } catch (error) {
-        console.error("[ChatMessages] Decryption error:", error);
-        return message.content;
+      } catch {
+        const fallback = "Unable to decrypt this message";
+        decryptedCache.set(message.id, fallback);
+        return fallback;
       }
     },
-    [channelId, decryptFromChannel, initialized, decryptedCache],
+    [channelId, decryptFromChannel, initialized, decryptedCache, profileId],
   );
+
+  // Decrypt loaded and real-time messages before rendering. The encrypted
+  // channel envelope is transport data and must never be shown as chat text.
+  useEffect(() => {
+    if (!initialized || messages.length === 0) return;
+    let disposed = false;
+    void Promise.all(
+      messages.map(async (message) => [message.id, await getDecryptedContent(message)] as const),
+    ).then((entries) => {
+      if (disposed) return;
+      setDecryptedContents((current) => {
+        const next = new Map(current);
+        for (const [id, content] of entries) next.set(id, content);
+        return next;
+      });
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [getDecryptedContent, initialized, messages]);
 
   useEffect(() => {
     const init = setTimeout(() => void load(), 0);
     const interval =
-      !socket || !isConnected
+      !socket || !isConnected || !isAuthenticated
         ? window.setInterval(() => void load(), 3000)
         : null;
 
@@ -106,18 +128,19 @@ export const ChatMessages = ({
       clearTimeout(init);
       if (interval) clearInterval(interval);
     };
-  }, [channelId, isConnected, load, socket]);
+  }, [channelId, isAuthenticated, isConnected, load, socket]);
 
   useEffect(() => {
     if (!initialized || memberIds.length === 0) return;
-    const recipients = memberIds.filter((memberId) => memberId !== profileId);
-    if (recipients.length > 0) {
-      void establishChannelSession(channelId, recipients);
+    // Include the current member as a recipient too, so the sender can read
+    // their own encrypted messages and encrypted file metadata after reload.
+    if (memberIds.length > 0) {
+      void establishChannelSession(channelId, memberIds, profileId);
     }
   }, [channelId, establishChannelSession, initialized, memberIds, profileId]);
 
   useEffect(() => {
-    if (!socket || !isConnected) return;
+    if (!socket || !isConnected || !isAuthenticated) return;
 
     const receive = async (event: {
       type: "created" | "updated" | "deleted";
@@ -146,7 +169,7 @@ export const ChatMessages = ({
       socket.emit("leave-channel", channelId);
       socket.off("message-event", receive);
     };
-  }, [channelId, isConnected, socket]);
+  }, [channelId, isAuthenticated, isConnected, socket]);
 
   useEffect(() => {
     const receiveSearch = async (event: Event) => {
@@ -263,7 +286,14 @@ export const ChatMessages = ({
             } catch {
               // Normal text message.
             }
-            const displayContent = attachment ? `📎 ${attachment.fileName}` : message.content;
+            const decryptedContent = decryptedContents.get(message.id);
+            const displayContent = message.deleted
+              ? "This message was deleted"
+              : attachment
+              ? `📎 ${attachment.fileName}`
+              : message.encrypted
+                ? decryptedContent ?? (initialized ? "Decrypting message…" : "Encrypted message")
+                : message.content;
 
             return (
               <article

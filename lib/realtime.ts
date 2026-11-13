@@ -61,30 +61,24 @@ wireRedisSubscription();
 
 export const publishChannelEvent = (channelId: string, event: unknown) => {
   const payload = { channelId, event };
+  realtime.emit("channel-event", payload);
   if (isRedisEnabled()) {
     void publishAsync("channel-event", payload);
-    return;
   }
-
-  realtime.emit("channel-event", payload);
 };
 
 export const publishConversationEvent = (conversationId: string, event: unknown) => {
   const payload = { conversationId, event };
+  realtime.emit("conversation-event", payload);
   if (isRedisEnabled()) {
     void publishAsync("conversation-event", payload);
-    return;
   }
-
-  realtime.emit("conversation-event", payload);
 };
 
 export const publishServerEvent = (serverId: string, event: unknown) => {
   const payload = { serverId, event };
+  realtime.emit("server-event", payload);
   if (isRedisEnabled()) {
     void publishAsync("server-event", payload);
-    return;
   }
-
-  realtime.emit("server-event", payload);
 };

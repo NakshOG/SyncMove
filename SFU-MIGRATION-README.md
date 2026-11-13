@@ -94,7 +94,7 @@ Check logs: `docker logs syncmove-sfu`
 
 ### Can't Connect to Call
 1. Verify SFU is running: `docker ps | grep syncmove-sfu`
-2. Check port 3333 and UDP ports `49152-65535` are accessible
+2. Check port 3333 and UDP ports `40000-40099` are accessible
 3. Verify network: `docker network inspect syncmove-network`
 
 ### Media Not Working
@@ -115,3 +115,10 @@ Check logs: `docker logs syncmove-sfu`
 2. Monitor SFU server resources
 3. Consider adding recording/streaming features
 4. Plan horizontal scaling for 500+ users
+
+## Current local configuration
+
+- SFU endpoint: `ws://localhost:3333`
+- RTP/RTCP UDP range: `40000-40099`
+- No P2P, public STUN, TURN, or Coturn configuration
+- Compose file: `docker-compose.sfu.yml`

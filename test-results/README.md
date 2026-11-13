@@ -197,6 +197,12 @@ docker-compose -f docker-compose.stress.yml up -d
 
 ---
 
+## Current verification
+
+The current run on November 14, 2026 passed 72/72 Vitest tests and the
+production build. Older totals in this directory are historical records.
+Full lint still reports four `no-explicit-any` errors in stress-test fixtures.
+
 ## Contact
 
 For questions about these tests, see:
@@ -205,6 +211,6 @@ For questions about these tests, see:
 
 ---
 
-**Last Updated:** November 13, 2026  
-**Test Version:** 1.0  
+**Last Updated:** November 14, 2026  
+**Test Version:** Current Vitest suite  
 **Status:** All 37 tests passing ✅

@@ -35,12 +35,20 @@ export const ChatHeader = ({
         : "Meet face to face with your team";
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [notificationsEnabled, setNotificationsEnabled] = useState(() =>
-    typeof window !== "undefined" && "Notification" in window
-      ? Notification.permission === "granted"
-      : false,
-  );
+  // Keep the first render identical on the server and client. Browser
+  // notification permission is only available after hydration.
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [showPinned, setShowPinned] = useState(false);
+
+  useEffect(() => {
+    const updatePermission = () => {
+      if ("Notification" in window) {
+        setNotificationsEnabled(Notification.permission === "granted");
+      }
+    };
+    const frame = window.requestAnimationFrame(updatePermission);
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     window.dispatchEvent(

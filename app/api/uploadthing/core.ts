@@ -20,11 +20,19 @@ export const ourFileRouter = {
     },
   })
     .middleware(async () => await handleAuth())
-    .onUploadComplete(() => {}),
+    .onUploadComplete(({ file, metadata }) => ({
+      ok: true,
+      userId: metadata.userId,
+      url: file.ufsUrl ?? file.url,
+    })),
 
   MessageFile: f(["image", "pdf"])
     .middleware(async () => await handleAuth())
-    .onUploadComplete(() => {}),
+    .onUploadComplete(({ file, metadata }) => ({
+      ok: true,
+      userId: metadata.userId,
+      url: file.ufsUrl ?? file.url,
+    })),
 
   encryptedFile: f({
     blob: {
@@ -33,7 +41,11 @@ export const ourFileRouter = {
     },
   })
     .middleware(async () => await handleAuth())
-    .onUploadComplete(() => {}),
+    .onUploadComplete(({ file, metadata }) => ({
+      ok: true,
+      userId: metadata.userId,
+      url: file.ufsUrl ?? file.url,
+    })),
 } satisfies FileRouter;
 
 export type OurFileRouter = typeof ourFileRouter;

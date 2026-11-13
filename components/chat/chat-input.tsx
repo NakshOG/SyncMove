@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { Paperclip, Send, Smile, X } from "lucide-react";
-import { FormEvent, useState, useCallback, useEffect, useRef } from "react";
+import { FormEvent, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EncryptedFileUpload } from "./encrypted-file-upload";
@@ -19,6 +19,7 @@ export const ChatInput = ({
   const [showUpload, setShowUpload] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const { encryptForChannel, initialized } = useE2EEContext();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -45,6 +46,7 @@ export const ChatInput = ({
   const handleSend = useCallback(async () => {
     if (!content.trim()) return;
     setSending(true);
+    setSendError(null);
 
     try {
       let finalContent = content;
@@ -77,6 +79,7 @@ export const ChatInput = ({
       onSent();
     } catch (error) {
       console.error("[ChatInput] Send error:", error);
+      setSendError(error instanceof Error ? error.message : "Unable to send message");
     } finally {
       setSending(false);
     }
@@ -116,6 +119,12 @@ export const ChatInput = ({
             <X />
           </Button>
         </div>
+      )}
+
+      {sendError && (
+        <p className="mx-auto mb-2 w-full max-w-5xl text-sm text-[#f23f42]" role="alert">
+          {sendError}
+        </p>
       )}
 
       <form

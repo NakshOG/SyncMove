@@ -1,4 +1,7 @@
-# System Stress Test Results - Breaking Point Analysis
+# Historical System Stress Test Results - Breaking Point Analysis
+
+> Historical simulation output. These measurements are not a production
+> capacity guarantee and predate the current realtime/E2EE implementation.
 
 **Date:** November 13, 2026  
 **System:** LAPTOP-CSU7E2AR (Intel64 Family 6 Model 186)  
@@ -597,6 +600,6 @@ Your system will break when:
 ---
 
 **Report Generated:** November 13, 2026  
-**Tests Run:** 53 tests (25 sequential + 15 concurrent + 13 standard)  
+**Tests Run:** Historical run; current suite is 72 Vitest tests  
 **Concurrent Tests:** 15 true concurrent simulations  
 **System Status:** ⚠️ Near breaking point - needs scaling

@@ -811,8 +811,8 @@ UPLOADTHING_APP_ID=...
 
 # Mediasoup SFU (local browser endpoint)
 NEXT_PUBLIC_MEDIASOUP_URL=ws://localhost:3333
-MEDIASOUP_RTC_MIN_PORT=49152
-MEDIASOUP_RTC_MAX_PORT=65535
+MEDIASOUP_RTC_MIN_PORT=40000
+MEDIASOUP_RTC_MAX_PORT=40099
 ```
 
 ---
@@ -950,7 +950,7 @@ docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
 | ------- | -------------- | ---- | ---------------------- |
 | app     | Next.js custom | 3000 | Web application        |
 | db      | MariaDB 10.11  | 3306 | Database               |
-| coturn  | coturn/coturn  | 3478 | TURN server (optional) |
+| Mediasoup SFU | local `mediasoup-sfu` | 3333 + UDP `40000-40099` | SFU-only media relay |
 
 ### Architecture Diagram
 
@@ -999,3 +999,19 @@ Required in `.env`:
 ---
 
 _Document generated: November 2026_
+
+## Current implementation notes
+
+The active local deployment is `docker-compose.sfu.yml`: NGINX, two Next.js
+app nodes, MariaDB primary/replica/failover services, Redis, and Mediasoup SFU.
+The SFU uses UDP ports `40000-40099`; browser media does not use P2P, public
+STUN, TURN, or Coturn.
+
+Channel E2EE uses a versioned per-recipient X25519/AES-GCM envelope so a
+receiver can decrypt after reconnecting without a live Double Ratchet
+handshake. Private identity keys and session state are persisted in IndexedDB
+and can be exported/imported using an encrypted password-protected backup.
+
+Realtime messages are persisted by the API and delivered through authenticated
+Socket.IO channel rooms. Redis carries cross-node fan-out while the local
+process emits immediately; clients de-duplicate events by message ID.

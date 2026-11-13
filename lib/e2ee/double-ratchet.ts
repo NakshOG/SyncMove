@@ -32,6 +32,7 @@ interface SymmetricState {
  * Double Ratchet State
  */
 export interface DoubleRatchetState {
+  bootstrapChainVersion?: number;
   // DH ratchet state
   dhRemotePublic: Uint8Array | null;  // Remote party's current DH public key
   dhLocalPublic: Uint8Array;          // Our current DH public key
@@ -90,6 +91,7 @@ export function createInitialState(
   remoteEphemeralPublic: Uint8Array
 ): DoubleRatchetState {
   return {
+    bootstrapChainVersion: 2,
     dhRemotePublic: remoteEphemeralPublic,
     dhLocalPublic: localEphemeralPublic,
     dhLocalPrivate: localEphemeralPrivate,
@@ -100,6 +102,25 @@ export function createInitialState(
     receivingChainLength: 0,
     skippedMessageKeys: new Map(),
   };
+}
+
+/**
+ * Initialize the first sending chain after X3DH. Older sessions were stored
+ * before this step existed, so this is intentionally idempotent and can also
+ * repair a restored session with a missing chain.
+ */
+export async function establishSendingChain(state: DoubleRatchetState): Promise<void> {
+  if (state.bootstrapChainVersion === 2 && state.sendingChainKey) return;
+  // The first channel message is encrypted before a DH header exchange has
+  // taken place. Derive this bootstrap chain from the X3DH shared secret so
+  // both independently-created peer sessions get the same first chain.
+  const derived = await hkdf(state.rootKey, state.rootKey, ROOT_KEY_INFO, 32);
+  state.sendingChainKey = derived;
+  state.sendingChainLength = 0;
+  state.receivingChainKey = null;
+  state.receivingChainLength = 0;
+  state.skippedMessageKeys.clear();
+  state.bootstrapChainVersion = 2;
 }
 
 /**
@@ -220,9 +241,18 @@ export async function decryptMessage(
     return await decryptAesGcm(skippedKey, header, ciphertext, mac);
   }
   
-  // DH ratchet if remote public key has changed
-  if (state.dhRemotePublic === null || 
-      !arraysEqual(state.dhRemotePublic, header.dhPublicKey)) {
+  // Bootstrap the receiving chain for the first message. The sender's first
+  // chain is derived from the X3DH shared secret, before a DH header exchange.
+  if (state.receivingChainKey === null && header.pn === 0 && state.receivingChainLength === 0) {
+    state.receivingChainKey = await hkdf(state.rootKey, state.rootKey, ROOT_KEY_INFO, 32);
+  }
+
+  // DH ratchet if remote public key has changed after the bootstrap message.
+  if (
+    state.receivingChainKey !== null &&
+    state.receivingChainLength > 0 &&
+    (state.dhRemotePublic === null || !arraysEqual(state.dhRemotePublic, header.dhPublicKey))
+  ) {
     // If header's PN > receivingChainLength, we skipped some messages
     // Store skipped message keys for future recovery
     if (header.pn > state.receivingChainLength) {
@@ -253,7 +283,7 @@ export async function decryptMessage(
   }
   
   // Derive message keys for skipped messages
-  while (state.receivingChainLength < header.mesgNr) {
+  while (state.receivingChainLength < header.mesgNr - 1) {
     const { messageKey, nextChainKey } = await deriveMessageKey(state.receivingChainKey!);
     state.receivingChainKey = nextChainKey;
     state.receivingChainLength++;
