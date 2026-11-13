@@ -1,14 +1,9 @@
-/**
- * Encrypted File Upload Component
- *
- * Handles file encryption before upload to UploadThing.
- * Flow: File → Compress → Encrypt (AES-GCM) → Upload → Share key with recipients
- */
-
 "use client";
 
 import { useState, useCallback } from "react";
-import { File, Lock, Unlock, Upload, X, Check } from "lucide-react";
+// NOTE: lucide's `File` icon is renamed so it does not shadow the global `File` type
+// used in useState<File | null>.
+import { File as FileIcon, Lock, Unlock, Upload, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { encryptFile } from "@/lib/e2ee/file-encryption";
@@ -31,13 +26,13 @@ interface FileMetadata {
   compressed: boolean;
 }
 
-type UploadState =
-  | "idle"
-  | "compressing"
-  | "encrypting"
-  | "uploading"
-  | "complete"
-  | "error";
+type UploadState = "idle" | "encrypting" | "uploading" | "complete" | "error";
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export function EncryptedFileUpload({
   channelId,
@@ -51,15 +46,11 @@ export function EncryptedFileUpload({
   const [error, setError] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<FileMetadata | null>(null);
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
   const handleFileSelect = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
+      // Reset the input so choosing the same file again still fires onChange.
+      event.target.value = "";
       if (!file) return;
 
       if (file.size > maxSize) {
@@ -71,6 +62,7 @@ export function EncryptedFileUpload({
       setError(null);
       setProgress(0);
       setMetadata(null);
+      setUploadState("idle");
     },
     [maxSize],
   );
@@ -79,16 +71,15 @@ export function EncryptedFileUpload({
     if (!selectedFile) return;
 
     try {
-      setUploadState("compressing");
+      setError(null);
+      setUploadState("encrypting");
       setProgress(10);
 
-      // Encrypt the file
+      // Encrypt the file in the browser before anything leaves the device
       const result = await encryptFile(selectedFile);
-
-      setUploadState("encrypting");
       setProgress(50);
 
-      // Upload to our API first (which handles UploadThing)
+      // Upload to our API (which handles UploadThing)
       const formData = new FormData();
       formData.append("file", result.encryptedBlob, "encrypted");
       formData.append("metadata", JSON.stringify(result.metadata));
@@ -129,9 +120,12 @@ export function EncryptedFileUpload({
     setUploadState("idle");
   }, []);
 
+  const inProgress = uploadState === "encrypting" || uploadState === "uploading";
+
   return (
     <div className="rounded-xl border border-white/5 bg-[#2b2d31] p-4">
-      {uploadState === "idle" && (
+      {/* Step 1: no file chosen yet */}
+      {!selectedFile && (
         <div className="flex flex-col items-center justify-center">
           <div className="mb-4 rounded-full bg-[#5865f2]/20 p-4">
             <Lock className="h-8 w-8 text-[#a5b4fc]" />
@@ -149,22 +143,25 @@ export function EncryptedFileUpload({
               onChange={handleFileSelect}
               className="hidden"
             />
-            <div className="flex items-center gap-2 rounded-xl bg-[#5865f2] px-6 py-2 text-white hover:bg-[#4752c4] transition-colors">
+            <div className="flex items-center gap-2 rounded-xl bg-[#5865f2] px-6 py-2 text-white transition-colors hover:bg-[#4752c4]">
               <Upload className="h-4 w-4" />
               Choose File
             </div>
           </label>
+
+          {error && <p className="mt-3 text-sm text-[#f23f42]">{error}</p>}
         </div>
       )}
 
-      {selectedFile && uploadState !== "idle" && (
+      {/* Step 2: file chosen -> review, upload, progress, result */}
+      {selectedFile && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-[#383a40] p-2">
-              <File className="h-5 w-5 text-[#b5bac1]" />
+              <FileIcon className="h-5 w-5 text-[#b5bac1]" />
             </div>
 
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-white">
                 {selectedFile.name}
               </p>
@@ -182,13 +179,11 @@ export function EncryptedFileUpload({
             )}
           </div>
 
-          {uploadState !== "complete" && (
+          {inProgress && (
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
-                <span className="text-[#949ba4] capitalize">
-                  {uploadState === "compressing" && "Compressing..."}
-                  {uploadState === "encrypting" && "Encrypting..."}
-                  {uploadState === "uploading" && "Uploading..."}
+                <span className="text-[#949ba4]">
+                  {uploadState === "encrypting" ? "Encrypting..." : "Uploading..."}
                 </span>
                 <span className="text-[#949ba4]">{progress}%</span>
               </div>
@@ -200,7 +195,7 @@ export function EncryptedFileUpload({
 
           {metadata && (
             <div className="rounded-lg bg-[#111214] p-3 text-xs">
-              <div className="flex items-center gap-2 text-[#23a559] mb-2">
+              <div className="mb-2 flex items-center gap-2 text-[#23a559]">
                 <Check className="h-4 w-4" />
                 <span className="font-medium">Encrypted successfully</span>
               </div>
@@ -213,33 +208,24 @@ export function EncryptedFileUpload({
 
           <div className="flex justify-end gap-2">
             {uploadState === "complete" ? (
-              <Button
-                variant="outline"
-                onClick={handleCancel}
-                className="rounded-xl"
-              >
+              <Button variant="outline" onClick={handleCancel} className="rounded-xl">
                 Upload Another
               </Button>
             ) : uploadState === "error" ? (
-              <Button
-                onClick={handleUpload}
-                className="rounded-xl bg-[#5865f2]"
-              >
-                Retry
-              </Button>
-            ) : uploadState === "idle" ? (
               <>
-                <Button
-                  variant="ghost"
-                  onClick={handleCancel}
-                  className="rounded-xl hover:bg-[#35373c]"
-                >
+                <Button variant="ghost" onClick={handleCancel} className="rounded-xl hover:bg-[#35373c]">
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleUpload}
-                  className="rounded-xl bg-[#5865f2] hover:bg-[#4752c4]"
-                >
+                <Button onClick={handleUpload} className="rounded-xl bg-[#5865f2] hover:bg-[#4752c4]">
+                  Retry
+                </Button>
+              </>
+            ) : uploadState === "idle" ? (
+              <>
+                <Button variant="ghost" onClick={handleCancel} className="rounded-xl hover:bg-[#35373c]">
+                  Cancel
+                </Button>
+                <Button onClick={handleUpload} className="rounded-xl bg-[#5865f2] hover:bg-[#4752c4]">
                   Encrypt & Upload
                 </Button>
               </>
@@ -271,8 +257,8 @@ export function EncryptedFileDownload({
   const [downloadState, setDownloadState] = useState<
     "idle" | "downloading" | "decrypting" | "complete" | "error"
   >("idle");
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [, setProgress] = useState(0);
+  const [, setError] = useState<string | null>(null);
 
   const handleDownload = useCallback(async () => {
     try {
@@ -288,9 +274,9 @@ export function EncryptedFileDownload({
 
       setDownloadState("decrypting");
 
-      // Import the file key (in real implementation, this comes from key storage)
-      // For now, we'll show the structure
-      const iv = new Uint8Array(12);
+      // TODO: this does NOT decrypt yet. It saves the ciphertext under the original
+      // name/type. Replace with the real decrypt call from "@/lib/e2ee/file-encryption"
+      // using the file key (looked up via metadata.keyId) and metadata.iv.
       const encryptedData = new Uint8Array(await encryptedBlob.arrayBuffer());
 
       setProgress(80);
@@ -319,12 +305,12 @@ export function EncryptedFileDownload({
   }, [fileUrl, metadata, fileName]);
 
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-[#2b2d31] p-3 hover:bg-[#35373c] transition-colors">
+    <div className="flex items-center gap-3 rounded-lg bg-[#2b2d31] p-3 transition-colors hover:bg-[#35373c]">
       <div className="rounded-lg bg-[#5865f2]/20 p-2">
         <Unlock className="h-5 w-5 text-[#a5b4fc]" />
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-white">{fileName}</p>
         <p className="text-xs text-[#949ba4]">
           {formatFileSize(metadata.encryptedSize)} · Encrypted
@@ -333,7 +319,7 @@ export function EncryptedFileDownload({
 
       <Button
         onClick={handleDownload}
-        disabled={downloadState !== "idle"}
+        disabled={downloadState === "downloading" || downloadState === "decrypting"}
         className="rounded-xl bg-[#5865f2] hover:bg-[#4752c4]"
       >
         {downloadState === "idle" && "Download"}
@@ -344,10 +330,4 @@ export function EncryptedFileDownload({
       </Button>
     </div>
   );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

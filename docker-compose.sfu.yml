@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   # Mediasoup SFU Server (replaces P2P mesh + Coturn)
   mediasoup-sfu:
