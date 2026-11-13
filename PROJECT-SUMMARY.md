@@ -1,6 +1,6 @@
 # SyncMove - Project Summary
 
-**Last Updated:** November 13, 2026  
+**Last Updated:** November 14, 2026  
 **Status:** ✅ Production Ready (SFU Migration Complete)
 
 ---
@@ -14,7 +14,7 @@ SyncMove is a real-time communication platform built with Next.js, featuring end
 ## Technology Stack
 
 ### Frontend
-- **Framework:** Next.js 16.3.2 (App Router)
+- **Framework:** Next.js 16.4.6 (App Router)
 - **UI Library:** React 19.2.8
 - **Styling:** Tailwind CSS 4
 - **Icons:** Lucide React
@@ -159,15 +159,15 @@ SyncMove/
 ### Test Results (Updated for SFU)
 
 ```
-Total Tests: 52
-Passed: 52
+Total Tests: 72
+Passed: 72
 Failed: 0
 Skipped: 0
 ```
 
 ### Test Categories
 
-1. **Architecture Tests (3)**
+1. **Architecture Tests (6)**
    - Multi-node setup validation
    - Primary/replica configuration
    - Mediasoup SFU connectivity
@@ -176,7 +176,7 @@ Skipped: 0
    - X3DH key agreement
    - Signed pre-key validation
 
-3. **Simulation Tests (8)**
+3. **Simulation Tests (9)**
    - Multi-user message flow
    - Burst traffic handling
    - Server capacity limits
@@ -188,7 +188,7 @@ Skipped: 0
    - Memory pressure testing
    - Breaking point analysis
 
-5. **Concurrent Tests (15)**
+5. **Concurrent Tests (19)**
    - True concurrent message bursts
    - Simultaneous video calls
    - High-concurrency load testing

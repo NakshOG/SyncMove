@@ -1,4 +1,4 @@
-# SyncMove - Development TODO
+# SyncMove development status
 
 ## Completed ✅
 
@@ -47,11 +47,11 @@
 
 ## Remaining Tasks
 
-### TURN Server Config - DONE
-- [x] Add TURN server credentials to environment
-- [x] Configure iceServers in WebRTC
-- [x] Coturn Docker configuration
-- [x] Self-hosted TURN server ready
+### Mediasoup SFU - DONE
+- [x] Mediasoup send/receive transports
+- [x] Producer/consumer lifecycle handling
+- [x] SFU-only local Docker stack
+- [x] P2P, public STUN, and Coturn paths removed from the client
 
 ---
 
@@ -68,41 +68,19 @@
 
 ---
 
-## TURN Server Configuration
+## Local SFU configuration
 
-For WebRTC calls to work behind corporate firewalls/NAT, you need a TURN server.
+Calls use the Mediasoup SFU only. No TURN server, public STUN server, or P2P fallback is configured.
 
-### Environment Variables
+### Environment variables
 ```bash
-# Get these from your TURN server provider
-TURN_SERVER_URL=your-turn-server.com:3478
-TURN_USERNAME=your-username
-TURN_PASSWORD=your-password
+NEXT_PUBLIC_MEDIASOUP_URL=ws://localhost:3333
+MEDIASOUP_RTC_MIN_PORT=49152
+MEDIASOUP_RTC_MAX_PORT=65535
 ```
 
-### Recommended TURN Providers
-1. **Twilio** - $0.001 per relay hour
-2. **OpenRelay** - Free, open source
-3. **Coturn** - Self-host (requires server)
+Run the supported local stack with:
 
-### Quick Deployment (OpenRelay - Free)
-1. Sign up at https://www.openrelayproject.com/
-2. Get credentials from dashboard
-3. Add to .env file
-4. Restart app
-
-### Self-Hosted (Coturn)
 ```bash
-# Docker compose example
-coturn:
-  image: coturn/coturn
-  ports:
-    - "3478:3478"
-    - "3478:3478/udp"
-  environment:
-    - TURN_SERVER_NAME=your-domain.com
-    - REALM=your-domain.com
-    - SECRET=your-secret
-  volumes:
-    - ./turnserver.conf:/etc/coturn/turnserver.conf
+docker compose -f docker-compose.sfu.yml up -d --build
 ```

@@ -1,10 +1,12 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
 # Install build dependencies for mediasoup worker compilation
-RUN apk add --no-cache python3 make g++ py3-pip
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 python3-pip make g++ pkg-config cmake \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install pip modules needed by mediasoup
 RUN pip3 install --break-system-packages pip setuptools wheel
@@ -22,7 +24,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine AS runner
+FROM node:22-bookworm-slim AS runner
 
 WORKDIR /app
 

@@ -83,7 +83,7 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 | **Prisma + MariaDB** | ORM + Database                    | Type-safe queries, migrations, MySQL compatible                                   |
 | **Redis**            | Distributed realtime coordination | Shared pub/sub, shared socket adapter, presence coordination across app instances |
 | **Socket.IO**        | Real-time communication           | Fallback to polling, rooms, events, auto-reconnect, Redis adapter support         |
-| **WebRTC**           | Video/Audio calls                 | Peer-to-peer via Mediasoup SFU (DTLS-SRTP)                       |
+| **WebRTC**           | Video/Audio calls                 | Mediasoup SFU only (DTLS-SRTP; no P2P/STUN/TURN)                 |
 | **UploadThing**      | File uploads                      | Simple API, works with S3, presigned URLs                         |
 | **Tailwind CSS**     | Styling                           | Rapid UI development, consistent design system                                    |
 | **Zustand**          | State management                  | Simple, minimal boilerplate, works with React                                     |
@@ -675,7 +675,7 @@ model KeyBundle {
 | Asset               | Protection                                  |
 | ------------------- | ------------------------------------------- |
 | **Message content** | E2EE (Signal Protocol) - Server cannot read |
-| **Media streams**   | DTLS-SRTP - Encrypted P2P                   |
+| **Media streams**   | DTLS-SRTP - Encrypted via Mediasoup SFU     |
 | **Private keys**    | IndexedDB only - Never transmitted          |
 | **User passwords**  | Clerk handles - We never see them           |
 | **File content**    | Encrypt before upload (future)              |
@@ -809,10 +809,10 @@ DATABASE_URL="mysql://..."
 UPLOADTHING_SECRET=sk_live_...
 UPLOADTHING_APP_ID=...
 
-# TURN Server (for WebRTC NAT traversal)
-TURN_SERVER_URL=your-turn-server.com:3478
-TURN_USERNAME=username
-TURN_PASSWORD=password
+# Mediasoup SFU (local browser endpoint)
+NEXT_PUBLIC_MEDIASOUP_URL=ws://localhost:3333
+MEDIASOUP_RTC_MIN_PORT=49152
+MEDIASOUP_RTC_MAX_PORT=65535
 ```
 
 ---
@@ -974,7 +974,7 @@ Required in `.env`:
 - `DATABASE_URL` - MySQL connection string
 - `CLERK_*` - Clerk authentication
 - `UPLOADTHING_*` - File storage credentials
-- `NEXT_PUBLIC_TURN_*` - TURN server (optional for local dev)
+- `NEXT_PUBLIC_MEDIASOUP_URL` - browser-visible SFU signaling endpoint
 
 ### Production Considerations
 

@@ -8,7 +8,7 @@ A desktop-first, zero-knowledge E2EE video chat and messaging platform built wit
 - **Signal Protocol** - X3DH key exchange + Double Ratchet for forward secrecy
 - **Group Encryption** - Sender Keys for efficient O(1) group messaging
 - **Secure File Sharing** - Compress-then-encrypt workflow before upload
-- **WebRTC Video/Audio Calls** - DTLS-SRTP enforced, TURN support for NAT traversal
+- **WebRTC Video/Audio Calls** - DTLS-SRTP enforced through a Mediasoup SFU; no P2P, STUN, or TURN
 - **Socket Security** - Clerk authentication, heartbeat, rate limiting, flood detection
 - **Distributed Real-Time** - Socket.IO + Redis adapter for multi-instance rooms, presence, and pub/sub fanout
 - **Zero-Knowledge Architecture** - Server cannot decrypt any user communications
@@ -22,7 +22,7 @@ A desktop-first, zero-knowledge E2EE video chat and messaging platform built wit
 - **Presence & Scale**: server-side TTL-based presence map with cross-instance fanout
 - **Auth**: Clerk
 - **File Storage**: UploadThing / S3-compatible storage
-- **WebRTC**: Native browser APIs with Coturn TURN server
+- **WebRTC**: `@mediasoup/client` with all media routed through the SFU
 - **Encryption**: Web Crypto API (X3DH, Double Ratchet, AES-GCM)
 
 ## Architecture
@@ -40,20 +40,20 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed system design documentation.
 
 ```bash
 # 1. Create a .env file in the project root
-#    Example: DATABASE_URL, REDIS_URL, Clerk keys, UploadThing keys, TURN keys
+#    Example: DATABASE_URL, REDIS_URL, Clerk keys, UploadThing keys, SFU settings
 
 # 2. Configure your environment variables in .env
 #    - Database credentials
 #    - Redis credentials (or local Redis URL)
 #    - Clerk authentication keys
 #    - UploadThing credentials
-#    - TURN server credentials
+#    - Mediasoup SFU settings (no TURN settings are used)
 
-# 3. Start all services (app, database, Redis, TURN server)
-docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
+# 3. Start all services (app, database, Redis, and Mediasoup SFU)
+docker compose -f docker-compose.sfu.yml up -d --build
 
 # 4. Access the application
-#    http://localhost:3000
+#    http://localhost/
 ```
 
 ### Manual Development
@@ -64,7 +64,7 @@ npm install
 
 # Configure environment
 # Create a .env file and add your credentials
-# Edit .env with your database, Redis, Clerk, UploadThing, and TURN values
+# Edit .env with your database, Redis, Clerk, UploadThing, and Mediasoup values
 
 # Start database and Redis
 
@@ -85,17 +85,12 @@ npx prisma db push
 npm run dev
 ```
 
-### TURN Server Setup
+### SFU media setup
 
-For WebRTC calls to work behind firewalls/NAT:
-
-```bash
-# Coturn is included in docker-compose.override.yml
-# Just ensure NEXT_PUBLIC_TURN_* variables are set in .env
-
-# Or run standalone:
-docker-compose -f docker-compose.coturn.yml up -d
-```
+The supported call path is Mediasoup SFU-only. Docker Compose exposes signaling on
+`localhost:3333` and UDP media ports `49152-65535`. The browser uses
+`NEXT_PUBLIC_MEDIASOUP_URL=ws://localhost:3333`; it must not use the internal
+Docker hostname `mediasoup-sfu`.
 
 ## Environment Variables
 
@@ -108,9 +103,9 @@ docker-compose -f docker-compose.coturn.yml up -d
 | `UPLOADTHING_SECRET`                | UploadThing secret key                                   | Yes                                            |
 | `UPLOADTHING_APP_ID`                | UploadThing app ID                                       | Yes                                            |
 | `UPLOADTHING_TOKEN`                 | UploadThing API token                                    | Yes                                            |
-| `NEXT_PUBLIC_TURN_SERVER_URL`       | TURN server URL                                          | No                                             |
-| `NEXT_PUBLIC_TURN_USERNAME`         | TURN username                                            | No                                             |
-| `NEXT_PUBLIC_TURN_CREDENTIAL`       | TURN credential                                          | No                                             |
+| `NEXT_PUBLIC_MEDIASOUP_URL`         | Browser-visible SFU WebSocket URL                        | Yes                                            |
+| `MEDIASOUP_RTC_MIN_PORT`            | SFU UDP range start                                      | Yes                                            |
+| `MEDIASOUP_RTC_MAX_PORT`            | SFU UDP range end                                        | Yes                                            |
 
 ## Project Structure
 
@@ -136,9 +131,7 @@ docker-compose -f docker-compose.coturn.yml up -d
 │   └── *.ts               # Utility libraries
 ├── prisma/
 │   └── schema.prisma      # Database schema
-├── docker-compose.yml     # Main compose (app + db + Redis)
-├── docker-compose.override.yml  # App + Coturn
-├── docker-compose.coturn.yml    # Coturn TURN server
+├── docker-compose.sfu.yml # Local app + db + Redis + Mediasoup SFU
 ├── lib/redis.ts           # Redis client factory for distributed realtime
 ├── Dockerfile             # Application container
 └── .env                   # Local environment configuration

@@ -1,8 +1,8 @@
-# Mediasoup SFU Migration Complete
+# Mediasoup SFU runtime
 
 ## What Changed
 
-### From P2P Mesh to SFU
+### SFU-only media
 
 **Before (P2P Mesh):**
 - Each user connects to every other user
@@ -35,7 +35,7 @@
 
 ### Start SFU Architecture
 ```bash
-docker-compose -f docker-compose.sfu.yml up -d
+docker compose -f docker-compose.sfu.yml up -d --build
 ```
 
 ### View Logs
@@ -83,8 +83,8 @@ Add more SFU nodes behind a load balancer and configure Redis for session sharin
 
 ## Migration Notes
 
-1. **TURN Server Removed:** SFU handles media routing, TURN not needed for P2P fallback
-2. **WebRTC Changed:** Uses SFU signaling instead of peer-to-peer
+1. **No TURN/P2P fallback:** the SFU is the only media route.
+2. **WebRTC changed:** uses SFU signaling and producer/consumer transports.
 3. **API Updated:** `/api/calls` endpoint for transport/producer management
 
 ## Troubleshooting
@@ -94,12 +94,13 @@ Check logs: `docker logs syncmove-sfu`
 
 ### Can't Connect to Call
 1. Verify SFU is running: `docker ps | grep syncmove-sfu`
-2. Check port 3333 is accessible
+2. Check port 3333 and UDP ports `49152-65535` are accessible
 3. Verify network: `docker network inspect syncmove-network`
 
 ### Media Not Working
 1. Check browser console for WebRTC errors
-2. Verify TURN config is correct (if needed for NAT traversal)
+2. Check `docker compose -f docker-compose.sfu.yml logs -f mediasoup-sfu`
+3. Confirm `NEXT_PUBLIC_MEDIASOUP_URL=ws://localhost:3333` for browser access
 
 ## Benefits
 
