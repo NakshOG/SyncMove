@@ -1,12 +1,5 @@
-version: '3.8'
-
 services:
   app:
     extends:
       file: docker-compose.yml
       service: app
-
-  coturn:
-    extends:
-      file: docker-compose.coturn.yml
-      service: coturn

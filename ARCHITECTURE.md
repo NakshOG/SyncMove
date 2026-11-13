@@ -767,13 +767,31 @@ Redis is the coordination layer that lets multiple app nodes share room state, p
 
 ### Scaling Considerations
 
-| Component       | Scaling Strategy                                               |
-| --------------- | -------------------------------------------------------------- |
-| **Next.js**     | Serverless (Vercel) - auto-scales                              |
-| **MariaDB**     | Managed DB (Planetscale/Railway)                               |
-| **Socket.IO**   | Horizontal scaling with Redis adapter (for multiple instances) |
-| **TURN Server** | Add more instances behind load balancer for call capacity      |
-| **UploadThing** | S3 handles storage, CDN for delivery                           |
+| Component       | Scaling Strategy                                                          |
+| --------------- | ------------------------------------------------------------------------- |
+| **Next.js**     | Serverless (Vercel) - auto-scales                                         |
+| **MariaDB**     | Primary database remains the ACID source of truth; replica for read scale |
+| **Socket.IO**   | Horizontal scaling with Redis adapter (for multiple instances)            |
+| **TURN Server** | Add more instances behind load balancer for call capacity                 |
+| **UploadThing** | S3 handles storage, CDN for delivery                                      |
+
+### ACID and Read-Replica Discipline
+
+For real transactional correctness, the primary database remains the only authority for writes:
+
+- write operations are committed to the primary database
+- replica nodes are used for read-heavy workloads only
+- read replicas may lag behind the primary, so they are not valid for write-after-read checks
+- session state, message creation, member changes, and key bundle writes must be enforced on the primary
+
+This matters because a replica is a scale optimization, not a replacement for ACID semantics.
+
+A common production pattern is:
+
+- primary: transactional writes, ledger-style operations, and critical queries
+- replica: message listing, server/member queries, dashboards, and analytics
+
+The local prototype intentionally follows the same rule, even though it is simplified for demo purposes.
 
 ### Environment Variables
 

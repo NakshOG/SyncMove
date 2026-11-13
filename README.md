@@ -167,6 +167,40 @@ Server: Cannot decrypt (no access to private keys)
 4. **File Encryption**: AES-GCM-256 (after compression)
 5. **Transport**: WebRTC DTLS-SRTP, HTTPS/TLS
 
+## Multi-Node Prototype Setup
+
+For a local multi-node prototype with NGINX, Redis, and a MariaDB primary/replica setup:
+
+```bash
+cp .env.multi.example .env
+
+docker compose -f docker-compose.multi.yml up -d --build
+```
+
+Then open:
+
+- http://localhost/ (NGINX load balancer)
+- http://localhost:3001/ (node 1 direct)
+- http://localhost:3002/ (node 2 direct)
+
+This is a prototype for validating:
+
+- sticky-session websocket behavior
+- Socket.IO fanout across multiple app nodes
+- Redis-backed realtime consistency
+- primary/replica read-scaling patterns
+
+### ACID and replica semantics
+
+This replica is not a second source of truth.
+
+- All writes must go to the primary database.
+- The replica is for read scaling and reporting only.
+- Replica lag means it is not safe for write-after-read consistency.
+- Primary database remains the ACID boundary for transactions and correctness.
+
+In other words, the prototype is intentionally simple and honest: it demonstrates how to add read scaling, but it does not weaken transactional correctness.
+
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture

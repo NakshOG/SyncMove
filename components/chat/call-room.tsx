@@ -65,7 +65,8 @@ const mergeParticipants = (members: Participant[]): Participant[] => {
 };
 
 /**
- * Generate TLS certificate for DTLS
+ * Generate DTLS certificate for WebRTC media encryption.
+ * Browser WebRTC uses DTLS-SRTP for secure media transport.
  */
 async function generateTLSCertificate(): Promise<RTCCertificate> {
   return await RTCPeerConnection.generateCertificate({
@@ -73,6 +74,42 @@ async function generateTLSCertificate(): Promise<RTCCertificate> {
     hash: "SHA-256",
     namedCurve: "P-256",
   });
+}
+
+/**
+ * Create a secure WebRTC peer connection using browser-native DTLS-SRTP media encryption.
+ * This is the actual encrypted media transport layer used by WebRTC, rather than an app-level
+ * custom compressor/encryptor.
+ */
+async function createSecurePeerConnection(
+  participant: Participant,
+  localStream: MediaStream,
+  onTrack: (event: RTCTrackEvent) => void,
+  onIceCandidate: (candidate: RTCIceCandidateInit) => void,
+): Promise<RTCPeerConnection> {
+  const certificate = await generateTLSCertificate();
+
+  const connection = new RTCPeerConnection({
+    iceServers: getICEServers(),
+    bundlePolicy: "max-bundle",
+    rtcpMuxPolicy: "require",
+    certificates: [certificate],
+    sdpSemantics: "unified-plan",
+  });
+
+  localStream.getTracks().forEach((track) => {
+    connection.addTrack(track, localStream);
+  });
+
+  connection.onicecandidate = (event) => {
+    if (event.candidate) {
+      onIceCandidate(event.candidate.toJSON());
+    }
+  };
+
+  connection.ontrack = onTrack;
+
+  return connection;
 }
 
 /**
@@ -182,7 +219,6 @@ export const CallRoom = ({
   const audioContext = useRef<AudioContext | null>(null);
   const analyser = useRef<AnalyserNode | null>(null);
   const speakingFrame = useRef<number | null>(null);
-  const certificateRef = useRef<Promise<RTCCertificate> | null>(null);
 
   const peers = useRef(new Map<string, RTCPeerConnection>());
   const pendingCandidates = useRef(new Map<string, RTCIceCandidateInit[]>());
@@ -307,29 +343,40 @@ export const CallRoom = ({
         return peers.current.get(participant.socketId);
       }
 
-      // Generate TLS certificate for DTLS (lazy, cached)
-      if (!certificateRef.current) {
-        certificateRef.current = generateTLSCertificate();
-      }
-      const certificate = await certificateRef.current;
+      // WebRTC media is protected by browser-native DTLS-SRTP before media leaves the peer.
+      const connection = await createSecurePeerConnection(
+        participant,
+        localStream.current,
+        (event) => {
+          const stream = event.streams[0];
+          if (!stream) return;
 
-      const connection = new RTCPeerConnection({
-        iceServers: getICEServers(),
-        // DTLS-SRTp is enforced by default in modern browsers
-        // Setting bundlePolicy and rtcpMuxPolicy for optimal encryption
-        bundlePolicy: "max-bundle",
-        rtcpMuxPolicy: "require",
-        certificates: [certificate],
-      });
+          setRemoteStreams((current) => {
+            const existingIndex = current.findIndex(
+              (item) => item.participant.socketId === participant.socketId,
+            );
+
+            if (existingIndex !== -1) {
+              const next = [...current];
+              next[existingIndex] = { participant, stream };
+              return next;
+            }
+
+            return [...current, { participant, stream }];
+          });
+        },
+        (candidate) => {
+          sendSignal(participant.socketId, {
+            kind: "candidate",
+            payload: candidate,
+          });
+        },
+      );
 
       peers.current.set(participant.socketId, connection);
       peerConnectionsRef.current.set(participant.socketId, {
         offerSent: false,
         remoteDescriptionSet: false,
-      });
-
-      localStream.current.getTracks().forEach((track) => {
-        connection.addTrack(track, localStream.current as MediaStream);
       });
 
       connection.getSenders().forEach((sender) => {
@@ -350,40 +397,12 @@ export const CallRoom = ({
         void sender.setParameters(parameters).catch(() => undefined);
       });
 
-      connection.onicecandidate = (event) => {
-        if (event.candidate) {
-          sendSignal(participant.socketId, {
-            kind: "candidate",
-            payload: event.candidate.toJSON(),
-          });
-        }
-      };
-
       connection.oniceconnectionstatechange = () => {
         const state = connection.iceConnectionState;
         if (state === "connected" || state === "completed") {
           setEncrypted(true);
           updateConnectionQuality();
         }
-      };
-
-      connection.ontrack = (event) => {
-        const stream = event.streams[0];
-        if (!stream) return;
-
-        setRemoteStreams((current) => {
-          const existingIndex = current.findIndex(
-            (item) => item.participant.socketId === participant.socketId,
-          );
-
-          if (existingIndex !== -1) {
-            const next = [...current];
-            next[existingIndex] = { participant, stream };
-            return next;
-          }
-
-          return [...current, { participant, stream }];
-        });
       };
 
       if (offer) {
