@@ -20,3 +20,4 @@ mysql -h "$PRIMARY_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" -e "
 "
 
 echo "[rejoin] primary remains as replica of ${REPLICA_HOST}"
+

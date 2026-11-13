@@ -188,7 +188,7 @@ describe('simulation: user and bot activity', () => {
     expect(secureTransport).toBe(true);
   });
 
-  it('benchmarks realistic video room traffic for small groups in a mesh model', () => {
+  it('benchmarks realistic video room traffic for small groups via Mediasoup SFU', () => {
     const videoBitrateMbpsPerPeer = 1.5;
     const participantCounts = [2, 4, 8, 12];
     const totalTrafficMbps = participantCounts.map((count) => count * (count - 1) * videoBitrateMbpsPerPeer);

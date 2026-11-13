@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Install build dependencies for mediasoup worker compilation
+RUN apk add --no-cache python3 make g++
+
 # Install dependencies first, including Prisma schema support
 COPY package*.json ./
 COPY prisma ./prisma

@@ -66,21 +66,12 @@ const mergeParticipants = (members: Participant[]): Participant[] => {
 };
 
 function getICEServers(): RTCIceServer[] {
-  const servers: RTCIceServer[] = [
+  // Mediasoup SFU handles media relay; no TURN server needed.
+  // STUN servers are sufficient for NAT traversal to reach the SFU.
+  return [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
   ];
-  const turnUrl = process.env.NEXT_PUBLIC_TURN_SERVER_URL;
-  const turnUsername = process.env.NEXT_PUBLIC_TURN_USERNAME;
-  const turnCredential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL;
-  if (turnUrl) {
-    servers.push(
-      turnUsername && turnCredential
-        ? { urls: turnUrl, username: turnUsername, credential: turnCredential }
-        : { urls: turnUrl },
-    );
-  }
-  return servers;
 }
 
 // socket.io request/response helper (server must call the ack callback).

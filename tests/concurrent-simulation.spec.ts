@@ -279,7 +279,7 @@ describe('TRUE CONCURRENT SIMULATIONS - Real-World Load Testing', () => {
         concurrentLoad: `${participants} concurrent WebRTC connections`,
         duration: `${(duration / 1000).toFixed(2)}s`,
         bottleneck: `Network bandwidth: ${totalBandwidthMbps} Mbps`,
-        recommendation: 'Use SFU (Selective Forwarding Unit), not mesh'
+        recommendation: 'Use Mediasoup SFU (Selective Forwarding Unit)'
       });
 
       expect(participants).toBe(300);

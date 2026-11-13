@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+dist
+build
+.env.local
+*.log
+npm-debug.log*
+.git
+.github
+test-results
+coverage
+*.md
+Dockerfile
+docker-compose*.yml
+.dockerignore
+prisma/migrations

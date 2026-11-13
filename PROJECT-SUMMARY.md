@@ -218,13 +218,6 @@ NEXT_PUBLIC_MEDIASOUP_URL=ws://localhost:3333
 ---
 
 ## Deployment
-
-### Start Single Node (Development)
-
-```bash
-docker-compose up -d
-```
-
 ### Start Multi-Node + SFU
 
 ```bash

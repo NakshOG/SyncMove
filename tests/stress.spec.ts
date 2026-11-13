@@ -645,8 +645,8 @@ describe('STRESS TESTS - System Breaking Point Analysis', () => {
         test: 'Max Audio Room',
         threshold: `${participants} participants`,
         reached: `${totalBandwidth} kbps total bandwidth`,
-        bottleneck: 'WebRTC mesh bandwidth',
-        recommendation: 'Use SFU (Selective Forwarding Unit) instead of mesh'
+        bottleneck: 'Mediasoup SFU routing bandwidth',
+        recommendation: 'Use Mediasoup SFU (Selective Forwarding Unit)'
       });
     });
 
@@ -659,8 +659,8 @@ describe('STRESS TESTS - System Breaking Point Analysis', () => {
         test: 'Max Video Room',
         threshold: `${participants} participants`,
         reached: `${totalBandwidth.toFixed(1)} Mbps total bandwidth`,
-        bottleneck: 'WebRTC mesh video bandwidth',
-        recommendation: 'Use SFU, implement simulcast, adaptive bitrate'
+        bottleneck: 'Mediasoup SFU video routing bandwidth',
+        recommendation: 'Use Mediasoup SFU with simulcast and adaptive bitrate'
       });
     });
 
@@ -765,7 +765,7 @@ describe('STRESS TESTS - System Breaking Point Analysis', () => {
           warning: 'Network congestion'
         },
         {
-          component: 'WebRTC mesh',
+          component: 'Mediasoup SFU',
           limit: 'Each user uploads to all others',
           safeUsage: 'Max 6 audio / 8 video participants',
           warning: 'Bandwidth exceeds client capacity'
