@@ -215,6 +215,38 @@ export const CallRoom = ({
   const [remoteStreams, setRemoteStreams] = useState<RemoteStream[]>([]);
   const [callError, setCallError] = useState<string | null>(null);
 
+  // The controls beside the profile logo are global call controls. Apply their
+  // state to the active microphone producer and remote speaker elements too.
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem("syncmove:audio-controls") ?? "null") as { muted?: boolean; deafened?: boolean } | null;
+      if (saved) {
+        setMuted(Boolean(saved.muted));
+        setDeafened(Boolean(saved.deafened));
+      }
+    } catch {
+      // Ignore malformed local preferences.
+    }
+
+    const applyControls = (event: Event) => {
+      const detail = (event as CustomEvent<{ muted?: boolean; deafened?: boolean }>).detail;
+      const nextMuted = Boolean(detail?.muted);
+      const nextDeafened = Boolean(detail?.deafened);
+      setMuted(nextMuted);
+      setDeafened(nextDeafened);
+      const track = localStream.current?.getAudioTracks()[0];
+      const producer = producersRef.current.get("audio");
+      if (track) track.enabled = !nextMuted;
+      if (producer) {
+        if (nextMuted) producer.pause();
+        else producer.resume();
+      }
+    };
+
+    window.addEventListener("syncmove:audio-controls", applyControls);
+    return () => window.removeEventListener("syncmove:audio-controls", applyControls);
+  }, []);
+
   const encrypted = active; // WebRTC media is always DTLS-SRTP encrypted once connected.
 
   const publishRemoteStreams = useCallback(() => {
@@ -424,6 +456,8 @@ export const CallRoom = ({
           : false,
       });
       localStream.current = media;
+      const localAudioTrack = media.getAudioTracks()[0];
+      if (localAudioTrack) localAudioTrack.enabled = !muted;
 
       // Register listeners BEFORE joining so no event is missed.
       const self = normalizeParticipant({ ...currentParticipant, socketId: `local:${currentParticipant.id}` });

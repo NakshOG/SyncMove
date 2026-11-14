@@ -43,6 +43,8 @@ The primary is the source of truth. The replica is for read scaling and failover
 
 Redis is not the permanent message store. MariaDB stores messages. Redis coordinates Socket.IO fan-out between app nodes and tracks online presence with TTL records. The local process emits immediately and Redis forwards to other app nodes. Clients de-duplicate by message ID.
 
+Direct-message presence uses the same authenticated Socket.IO layer but a profile-scoped Redis presence set rather than a server-only membership room. The client requests an initial snapshot of its DM contacts and receives update events when a contact connects or disconnects. Multiple sockets per profile are counted so closing one tab does not produce a false offline event.
+
 ### How does a message reach another user?
 
 The sender encrypts text in the browser and sends the encrypted envelope to `POST /api/messages`. The API stores it in MariaDB and publishes a channel event. Socket.IO sends it to authenticated channel members. The receiver updates local state and decrypts only its recipient entry. Refresh is not required.
@@ -62,6 +64,8 @@ The server stores public key bundles and encrypted message/file data. Private id
 ### What happens after refresh or a year offline?
 
 The durable identity key is loaded from IndexedDB. The app never replaces a valid identity merely because a pre-key is missing; it repairs only the disposable signed pre-key. Sessions are persisted locally and password-protected export/import is available. If site data is cleared or the device changes, the encrypted backup is required. Without the original private key, old ciphertext cannot be recovered by design.
+
+Public server logos are intentionally outside this privacy boundary: they are compressed and stored as normal remote URLs in the server record. Only chat messages and chat files require E2EE.
 
 ### How are files protected?
 
@@ -113,7 +117,7 @@ The LAN certificate is local trust infrastructure, not a public production certi
 
 ## Compute, storage, and improvement
 
-The test environment had 16 logical CPU processors and about 15.64 GB RAM. The stress suite measured approximately 28,334 E2EE operations per second in its crypto benchmark. The concurrent suite included a 60-second simulation, 1,000 WebSocket connections, 100 concurrent database queries, 100 concurrent uploads, and SFU audio/video scenarios.
+The test environment had 16 logical CPU processors and about 15.64 GB RAM. The stress suite measured approximately 28,334 E2EE operations per second in its crypto benchmark. The concurrent suite included a 60-second simulation, 1,000 WebSocket connections, 100 concurrent database queries, 100 concurrent uploads, and SFU audio/video scenarios. The 100-participant video value is a routing model; it is not a claim that this laptop can sustain 100 live camera producers.
 
 These are simulation measurements, not production capacity guarantees. Actual limits depend on payload size, browser hardware, network, database configuration, SFU bitrate, and Redis latency. Encryption and file processing are mostly client-side; the server stores ciphertext and routes events/media.
 

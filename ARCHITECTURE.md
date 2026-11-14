@@ -185,7 +185,9 @@ SyncMove is a **desktop-first**, **end-to-end encrypted** video chat and messagi
 |-------|-----------|---------|
 | `join-channel` | Client → Server | Join a channel room |
 | `message-event` | Server → Client | New/updated/deleted message |
-| `server-presence` | Server → Client | Online members |
+| `server-presence` | Server → Client | Online members in a server |
+| `presence:snapshot` | Socket → Client | Initial online state for direct-message peers |
+| `presence:update` | Server → Client | Realtime profile online/offline changes for direct messages |
 | `call-presence` | Server → Client | Active call participants |
 
 ---
@@ -1010,7 +1012,7 @@ STUN, TURN, or Coturn.
 Channel E2EE uses a versioned per-recipient X25519/AES-GCM envelope so a
 receiver can decrypt after reconnecting without a live Double Ratchet
 handshake. Private identity keys and session state are persisted in IndexedDB
-and can be exported/imported using an encrypted password-protected backup.
+and can be exported/imported using an encrypted password-protected backup. Peer bundles are cached in the browser for five minutes with in-flight request deduplication.
 
 Realtime messages are persisted by the API and delivered through authenticated
 Socket.IO channel rooms. Redis carries cross-node fan-out while the local

@@ -5,6 +5,9 @@ export type RedisPresenceRecord = {
   socketId: string;
 };
 
+const GLOBAL_PRESENCE_USERS = "syncmove:presence:users";
+const globalPresenceSockets = (profileId: string) => `syncmove:presence:user:${profileId}:sockets`;
+
 const state = globalThis as typeof globalThis & {
   __syncmoveRedisClient?: RedisClientType;
   __syncmoveRedisSubscriber?: RedisClientType;
@@ -114,4 +117,30 @@ export async function getServerPresence(serverId: string): Promise<string[]> {
       return false;
     }
   });
+}
+
+export async function setGlobalPresence(profileId: string, socketId: string, online: boolean): Promise<void> {
+  if (!profileId || !socketId || !isRedisEnabled()) return;
+  const client = await getRedisClient();
+  if (!client) return;
+  const socketKey = globalPresenceSockets(profileId);
+  if (online) {
+    await client.sAdd(socketKey, socketId);
+    await client.expire(socketKey, 120);
+    await client.sAdd(GLOBAL_PRESENCE_USERS, profileId);
+    return;
+  }
+  await client.sRem(socketKey, socketId);
+  if ((await client.sCard(socketKey)) === 0) await client.sRem(GLOBAL_PRESENCE_USERS, profileId);
+}
+
+export async function getGlobalPresence(profileIds: string[]): Promise<string[]> {
+  if (!profileIds.length) return [];
+  if (!isRedisEnabled()) return [];
+  const client = await getRedisClient();
+  if (!client) return [];
+  const online = await Promise.all(profileIds.map(async (profileId) =>
+    (await client.sIsMember(GLOBAL_PRESENCE_USERS, profileId)) ? profileId : null,
+  ));
+  return online.filter((profileId): profileId is string => Boolean(profileId));
 }

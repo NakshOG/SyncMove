@@ -7,12 +7,12 @@
 **Before (P2P Mesh):**
 - Each user connects to every other user
 - Bandwidth: O(N²) - 6 participants = 1.92 Mbps, 8 video = 84 Mbps
-- Max participants: 6 audio / 4-8 video
+- Historical mesh rooms became expensive at small participant counts
 
 **After (Mediasoup SFU):**
 - Each user connects to SFU server
-- Bandwidth: O(N) - 6 participants = 600 kbps upload, 600 kbps download
-- Max participants: 100+ (depends on SFU server capacity)
+- Client upload is O(1) per producer; SFU egress grows with subscriptions
+- Current simulation target: 100 participants; actual capacity depends on SFU CPU, bitrate, egress, and network
 
 ## Files Created
 
@@ -74,9 +74,9 @@ The Mediasoup SFU server runs on port 3333 and handles:
 ## Scaling
 
 ### Current (Single SFU Node)
-- **Audio Participants:** 100+
-- **Video Participants:** 50+
-- **Bandwidth per User:** ~600 kbps (up + down)
+- **Audio Participants:** 100-participant simulation target
+- **Video Participants:** 100-participant simulation target
+- **Measured media capacity:** Requires active WebRTC producer load; signaling-only tests do not establish it
 
 ### For More Users
 Add more SFU nodes behind a load balancer and configure Redis for session sharing.

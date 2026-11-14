@@ -77,6 +77,7 @@ export const FileUpload = ({ onChange, value, endpoint }: FileUploadProps) => {
             src={localValue}
             alt="File preview"
             sizes="96px"
+            unoptimized
             className="rounded-lg object-cover border-2 border-zinc-700 shadow-md"
             onLoad={() => setIsPreviewLoading(false)}
             onError={() => {
@@ -116,6 +117,8 @@ export const FileUpload = ({ onChange, value, endpoint }: FileUploadProps) => {
         )
       }
       onClientUploadComplete={(res) => {
+        // ServerImage is intentionally compressed public media. MessageFile and
+        // encryptedFile continue through their separate E2EE workflows.
         const uploaded = res[0] as { url?: string; ufsUrl?: string } | undefined;
         onChange(uploaded?.ufsUrl ?? uploaded?.url);
       }}

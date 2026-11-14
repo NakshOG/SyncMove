@@ -1,0 +1,1641 @@
+{
+  "startedAt": "2026-11-14T01:42:04.867Z",
+  "finishedAt": "2026-11-14T01:43:03.831Z",
+  "configuration": {
+    "baseUrl": "http://localhost:3000",
+    "sfuUrl": "http://localhost:3333",
+    "users": 439,
+    "durationSeconds": 30,
+    "requestIntervalMs": 250,
+    "loadTestPath": "/api/load-test",
+    "authMiddlewareBypassed": true,
+    "authenticatedMessageLoad": false,
+    "channelIdProvided": false
+  },
+  "api": {
+    "requests": 1764,
+    "responses": 1713,
+    "errors": 51,
+    "throughputPerSecond": 57.1,
+    "p95Ms": 30435.01,
+    "p99Ms": 30486.04,
+    "minMs": 2.04,
+    "maxMs": 30498.88
+  },
+  "messages": {
+    "attempts": 0,
+    "accepted": 0,
+    "rejected": 0,
+    "messagesPerSecond": 0,
+    "status": "not measured: set LOAD_AUTH_TOKEN and LOAD_CHANNEL_ID"
+  },
+  "websocket": {
+    "attempted": 439,
+    "connected": 439,
+    "connectionFailures": 0,
+    "connectionFailureRatePercent": 0,
+    "unexpectedDisconnects": 0,
+    "disconnectRatePercent": 0,
+    "status": "Socket.IO signaling connections; not a WebRTC media test"
+  },
+  "database": {
+    "before": {
+      "active": 1,
+      "limit": 151
+    },
+    "after": {
+      "active": 11,
+      "limit": 151
+    },
+    "peakObservedConnections": 11
+  },
+  "redis": {
+    "before": {
+      "instantaneousOpsPerSecond": 0,
+      "totalCommandsProcessed": 38
+    },
+    "after": {
+      "instantaneousOpsPerSecond": 0,
+      "totalCommandsProcessed": 457
+    },
+    "commandDelta": 419
+  },
+  "containers": [
+    {
+      "at": "2026-11-14T01:42:07.394Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:07.394Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:07.394Z syncmove-app-1",
+      "cpuPercent": 0.02,
+      "memoryMb": 212.5,
+      "networkRxMb": 15.6,
+      "networkTxMb": 27.2
+    },
+    {
+      "at": "2026-11-14T01:42:07.394Z syncmove-sfu",
+      "cpuPercent": 8.11,
+      "memoryMb": 136.1,
+      "networkRxMb": 4.1,
+      "networkTxMb": 3.99
+    },
+    {
+      "at": "2026-11-14T01:42:07.394Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:07.394Z syncmove-db-replica",
+      "cpuPercent": 0.02,
+      "memoryMb": 79.66,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:07.394Z syncmove-redis",
+      "cpuPercent": 0.61,
+      "memoryMb": 5.234,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:07.394Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 103.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:10.550Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:10.550Z syncmove-app-2",
+      "cpuPercent": 0.02,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:10.550Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.6,
+      "networkRxMb": 15.9,
+      "networkTxMb": 27.6
+    },
+    {
+      "at": "2026-11-14T01:42:10.550Z syncmove-sfu",
+      "cpuPercent": 0.09,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.42,
+      "networkTxMb": 4.3
+    },
+    {
+      "at": "2026-11-14T01:42:10.550Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:10.550Z syncmove-db-replica",
+      "cpuPercent": 0.02,
+      "memoryMb": 79.66,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:10.550Z syncmove-redis",
+      "cpuPercent": 0.47,
+      "memoryMb": 4.984,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:10.550Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 103.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:12.586Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:12.586Z syncmove-app-2",
+      "cpuPercent": 0.04,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:12.586Z syncmove-app-1",
+      "cpuPercent": 0.02,
+      "memoryMb": 212.6,
+      "networkRxMb": 16,
+      "networkTxMb": 27.7
+    },
+    {
+      "at": "2026-11-14T01:42:12.586Z syncmove-sfu",
+      "cpuPercent": 0.09,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.42,
+      "networkTxMb": 4.3
+    },
+    {
+      "at": "2026-11-14T01:42:12.586Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:12.586Z syncmove-db-replica",
+      "cpuPercent": 0.02,
+      "memoryMb": 79.66,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:12.586Z syncmove-redis",
+      "cpuPercent": 0.6,
+      "memoryMb": 4.984,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:12.586Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 103.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:14.624Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:14.624Z syncmove-app-2",
+      "cpuPercent": 11.68,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:14.624Z syncmove-app-1",
+      "cpuPercent": 1.31,
+      "memoryMb": 212.8,
+      "networkRxMb": 16,
+      "networkTxMb": 27.8
+    },
+    {
+      "at": "2026-11-14T01:42:14.624Z syncmove-sfu",
+      "cpuPercent": 0.06,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.42,
+      "networkTxMb": 4.3
+    },
+    {
+      "at": "2026-11-14T01:42:14.624Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:14.624Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.66,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:14.624Z syncmove-redis",
+      "cpuPercent": 0.55,
+      "memoryMb": 4.984,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:14.624Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 103.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:16.649Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:16.649Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:16.649Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 213.2,
+      "networkRxMb": 16.1,
+      "networkTxMb": 27.8
+    },
+    {
+      "at": "2026-11-14T01:42:16.649Z syncmove-sfu",
+      "cpuPercent": 6.81,
+      "memoryMb": 135.5,
+      "networkRxMb": 4.42,
+      "networkTxMb": 4.3
+    },
+    {
+      "at": "2026-11-14T01:42:16.649Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:16.649Z syncmove-db-replica",
+      "cpuPercent": 0.02,
+      "memoryMb": 79.67,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:16.649Z syncmove-redis",
+      "cpuPercent": 0.54,
+      "memoryMb": 5.234,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:16.649Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 103.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:18.691Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:18.691Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:18.691Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 213.4,
+      "networkRxMb": 16.1,
+      "networkTxMb": 27.9
+    },
+    {
+      "at": "2026-11-14T01:42:18.691Z syncmove-sfu",
+      "cpuPercent": 0.1,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.42,
+      "networkTxMb": 4.3
+    },
+    {
+      "at": "2026-11-14T01:42:18.691Z syncmove-db-failover",
+      "cpuPercent": 0.62,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:18.691Z syncmove-db-replica",
+      "cpuPercent": 0.02,
+      "memoryMb": 79.66,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:18.691Z syncmove-redis",
+      "cpuPercent": 0.64,
+      "memoryMb": 5.234,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:18.691Z syncmove-db-primary",
+      "cpuPercent": 0.04,
+      "memoryMb": 103.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:20.753Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:20.753Z syncmove-app-2",
+      "cpuPercent": 0.02,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:20.753Z syncmove-app-1",
+      "cpuPercent": 0.8,
+      "memoryMb": 213.3,
+      "networkRxMb": 16.1,
+      "networkTxMb": 27.9
+    },
+    {
+      "at": "2026-11-14T01:42:20.753Z syncmove-sfu",
+      "cpuPercent": 0.09,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.42,
+      "networkTxMb": 4.3
+    },
+    {
+      "at": "2026-11-14T01:42:20.753Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:20.753Z syncmove-db-replica",
+      "cpuPercent": 0.02,
+      "memoryMb": 79.67,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:20.753Z syncmove-redis",
+      "cpuPercent": 0.45,
+      "memoryMb": 4.984,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:20.753Z syncmove-db-primary",
+      "cpuPercent": 1.3,
+      "memoryMb": 103.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:22.784Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:22.784Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:22.784Z syncmove-app-1",
+      "cpuPercent": 1.24,
+      "memoryMb": 213.3,
+      "networkRxMb": 16.1,
+      "networkTxMb": 27.9
+    },
+    {
+      "at": "2026-11-14T01:42:22.784Z syncmove-sfu",
+      "cpuPercent": 0.14,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.44,
+      "networkTxMb": 4.32
+    },
+    {
+      "at": "2026-11-14T01:42:22.784Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:22.784Z syncmove-db-replica",
+      "cpuPercent": 0.02,
+      "memoryMb": 79.67,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:22.784Z syncmove-redis",
+      "cpuPercent": 0.58,
+      "memoryMb": 4.984,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:22.784Z syncmove-db-primary",
+      "cpuPercent": 0.01,
+      "memoryMb": 103.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:24.812Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:24.812Z syncmove-app-2",
+      "cpuPercent": 11.84,
+      "memoryMb": 119.9,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:24.812Z syncmove-app-1",
+      "cpuPercent": 0.17,
+      "memoryMb": 213,
+      "networkRxMb": 16.1,
+      "networkTxMb": 27.9
+    },
+    {
+      "at": "2026-11-14T01:42:24.812Z syncmove-sfu",
+      "cpuPercent": 0.16,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.45,
+      "networkTxMb": 4.33
+    },
+    {
+      "at": "2026-11-14T01:42:24.812Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:24.812Z syncmove-db-replica",
+      "cpuPercent": 0.02,
+      "memoryMb": 79.67,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:24.812Z syncmove-redis",
+      "cpuPercent": 0.46,
+      "memoryMb": 4.984,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:24.812Z syncmove-db-primary",
+      "cpuPercent": 0.03,
+      "memoryMb": 103.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:26.842Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:26.842Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:26.842Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 213,
+      "networkRxMb": 16.2,
+      "networkTxMb": 28
+    },
+    {
+      "at": "2026-11-14T01:42:26.842Z syncmove-sfu",
+      "cpuPercent": 6.87,
+      "memoryMb": 135.4,
+      "networkRxMb": 4.45,
+      "networkTxMb": 4.33
+    },
+    {
+      "at": "2026-11-14T01:42:26.842Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:26.842Z syncmove-db-replica",
+      "cpuPercent": 0.02,
+      "memoryMb": 79.95,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:26.842Z syncmove-redis",
+      "cpuPercent": 0.57,
+      "memoryMb": 5.234,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:26.842Z syncmove-db-primary",
+      "cpuPercent": 0.01,
+      "memoryMb": 103.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:28.873Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:28.873Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:28.873Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.9,
+      "networkRxMb": 16.2,
+      "networkTxMb": 28
+    },
+    {
+      "at": "2026-11-14T01:42:28.873Z syncmove-sfu",
+      "cpuPercent": 0.18,
+      "memoryMb": 135.4,
+      "networkRxMb": 4.45,
+      "networkTxMb": 4.33
+    },
+    {
+      "at": "2026-11-14T01:42:28.873Z syncmove-db-failover",
+      "cpuPercent": 0.96,
+      "memoryMb": 1.402,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:28.873Z syncmove-db-replica",
+      "cpuPercent": 0.02,
+      "memoryMb": 79.72,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:28.873Z syncmove-redis",
+      "cpuPercent": 0.6,
+      "memoryMb": 4.984,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:28.873Z syncmove-db-primary",
+      "cpuPercent": 0.07,
+      "memoryMb": 103.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:30.900Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:30.900Z syncmove-app-2",
+      "cpuPercent": 0.03,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:30.900Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 213.3,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:30.900Z syncmove-sfu",
+      "cpuPercent": 0.15,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.45,
+      "networkTxMb": 4.33
+    },
+    {
+      "at": "2026-11-14T01:42:30.900Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:30.900Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:30.900Z syncmove-redis",
+      "cpuPercent": 0.72,
+      "memoryMb": 5.242,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:30.900Z syncmove-db-primary",
+      "cpuPercent": 0.84,
+      "memoryMb": 104.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:32.943Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:32.943Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:32.943Z syncmove-app-1",
+      "cpuPercent": 0.02,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:32.943Z syncmove-sfu",
+      "cpuPercent": 3.01,
+      "memoryMb": 135.4,
+      "networkRxMb": 4.48,
+      "networkTxMb": 4.36
+    },
+    {
+      "at": "2026-11-14T01:42:32.943Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:32.943Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:32.943Z syncmove-redis",
+      "cpuPercent": 0.51,
+      "memoryMb": 5.52,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:32.943Z syncmove-db-primary",
+      "cpuPercent": 0.01,
+      "memoryMb": 104.6,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:34.971Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:34.971Z syncmove-app-2",
+      "cpuPercent": 11.51,
+      "memoryMb": 120.2,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:34.971Z syncmove-app-1",
+      "cpuPercent": 0.02,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:34.971Z syncmove-sfu",
+      "cpuPercent": 0.14,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.48,
+      "networkTxMb": 4.36
+    },
+    {
+      "at": "2026-11-14T01:42:34.971Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:34.971Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:34.971Z syncmove-redis",
+      "cpuPercent": 0.62,
+      "memoryMb": 5.27,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:34.971Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 104.3,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:36.989Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:36.989Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:36.989Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:36.989Z syncmove-sfu",
+      "cpuPercent": 7.87,
+      "memoryMb": 135.5,
+      "networkRxMb": 4.48,
+      "networkTxMb": 4.36
+    },
+    {
+      "at": "2026-11-14T01:42:36.989Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:36.989Z syncmove-db-replica",
+      "cpuPercent": 0.03,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:36.989Z syncmove-redis",
+      "cpuPercent": 0.34,
+      "memoryMb": 5.52,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:36.989Z syncmove-db-primary",
+      "cpuPercent": 0.01,
+      "memoryMb": 104.3,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:39.044Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:39.044Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:39.044Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.9,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:39.044Z syncmove-sfu",
+      "cpuPercent": 0.21,
+      "memoryMb": 135.7,
+      "networkRxMb": 4.48,
+      "networkTxMb": 4.36
+    },
+    {
+      "at": "2026-11-14T01:42:39.044Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:39.044Z syncmove-db-replica",
+      "cpuPercent": 0.02,
+      "memoryMb": 79.67,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:39.044Z syncmove-redis",
+      "cpuPercent": 0.55,
+      "memoryMb": 5.27,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:39.044Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 104.9,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:41.068Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:41.068Z syncmove-app-2",
+      "cpuPercent": 0.02,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:41.068Z syncmove-app-1",
+      "cpuPercent": 0.02,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:41.068Z syncmove-sfu",
+      "cpuPercent": 0.09,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.48,
+      "networkTxMb": 4.36
+    },
+    {
+      "at": "2026-11-14T01:42:41.068Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:41.068Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:41.068Z syncmove-redis",
+      "cpuPercent": 1.57,
+      "memoryMb": 6.926,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:41.068Z syncmove-db-primary",
+      "cpuPercent": 1.81,
+      "memoryMb": 105,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:43.098Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:43.098Z syncmove-app-2",
+      "cpuPercent": 0.02,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:43.098Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:43.098Z syncmove-sfu",
+      "cpuPercent": 0.11,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.48,
+      "networkTxMb": 4.36
+    },
+    {
+      "at": "2026-11-14T01:42:43.098Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:43.098Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:43.098Z syncmove-redis",
+      "cpuPercent": 1.29,
+      "memoryMb": 6.914,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:43.098Z syncmove-db-primary",
+      "cpuPercent": 1.39,
+      "memoryMb": 104.9,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:45.134Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:45.134Z syncmove-app-2",
+      "cpuPercent": 11.92,
+      "memoryMb": 119.8,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:45.134Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:45.134Z syncmove-sfu",
+      "cpuPercent": 0.05,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.48,
+      "networkTxMb": 4.36
+    },
+    {
+      "at": "2026-11-14T01:42:45.134Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:45.134Z syncmove-db-replica",
+      "cpuPercent": 0.03,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:45.134Z syncmove-redis",
+      "cpuPercent": 0.53,
+      "memoryMb": 6.914,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:45.134Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 104.4,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:47.168Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:47.168Z syncmove-app-2",
+      "cpuPercent": 0.02,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:47.168Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:47.168Z syncmove-sfu",
+      "cpuPercent": 9.04,
+      "memoryMb": 135.7,
+      "networkRxMb": 4.49,
+      "networkTxMb": 4.37
+    },
+    {
+      "at": "2026-11-14T01:42:47.168Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:47.168Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:47.168Z syncmove-redis",
+      "cpuPercent": 0.47,
+      "memoryMb": 7.164,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:47.168Z syncmove-db-primary",
+      "cpuPercent": 0.01,
+      "memoryMb": 104.4,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:49.198Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:49.198Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:49.198Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:49.198Z syncmove-sfu",
+      "cpuPercent": 0.08,
+      "memoryMb": 135.4,
+      "networkRxMb": 4.51,
+      "networkTxMb": 4.39
+    },
+    {
+      "at": "2026-11-14T01:42:49.198Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:49.198Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:49.198Z syncmove-redis",
+      "cpuPercent": 0.42,
+      "memoryMb": 6.914,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:49.198Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 104.4,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:51.234Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:51.234Z syncmove-app-2",
+      "cpuPercent": 0.02,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:51.234Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:51.234Z syncmove-sfu",
+      "cpuPercent": 0.12,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.52,
+      "networkTxMb": 4.39
+    },
+    {
+      "at": "2026-11-14T01:42:51.234Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:51.234Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:51.234Z syncmove-redis",
+      "cpuPercent": 0.46,
+      "memoryMb": 6.914,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:51.234Z syncmove-db-primary",
+      "cpuPercent": 0.01,
+      "memoryMb": 104.4,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:53.243Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:53.243Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:53.243Z syncmove-app-1",
+      "cpuPercent": 0.02,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:53.243Z syncmove-sfu",
+      "cpuPercent": 0.08,
+      "memoryMb": 135.4,
+      "networkRxMb": 4.52,
+      "networkTxMb": 4.39
+    },
+    {
+      "at": "2026-11-14T01:42:53.243Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:53.243Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:53.243Z syncmove-redis",
+      "cpuPercent": 0.49,
+      "memoryMb": 7.168,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:53.243Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 104.7,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:55.298Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:55.298Z syncmove-app-2",
+      "cpuPercent": 19.09,
+      "memoryMb": 119.6,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:55.298Z syncmove-app-1",
+      "cpuPercent": 0.04,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:55.298Z syncmove-sfu",
+      "cpuPercent": 0.07,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.52,
+      "networkTxMb": 4.39
+    },
+    {
+      "at": "2026-11-14T01:42:55.298Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:55.298Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:55.298Z syncmove-redis",
+      "cpuPercent": 1.16,
+      "memoryMb": 7.168,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:55.298Z syncmove-db-primary",
+      "cpuPercent": 1.25,
+      "memoryMb": 104.9,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:57.324Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:57.324Z syncmove-app-2",
+      "cpuPercent": 0.02,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:57.324Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:57.324Z syncmove-sfu",
+      "cpuPercent": 10.5,
+      "memoryMb": 135.7,
+      "networkRxMb": 4.52,
+      "networkTxMb": 4.39
+    },
+    {
+      "at": "2026-11-14T01:42:57.324Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:57.324Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:57.324Z syncmove-redis",
+      "cpuPercent": 0.45,
+      "memoryMb": 7.164,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:57.324Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 104.4,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:59.359Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:59.359Z syncmove-app-2",
+      "cpuPercent": 0.02,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:59.359Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:42:59.359Z syncmove-sfu",
+      "cpuPercent": 0.1,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.52,
+      "networkTxMb": 4.4
+    },
+    {
+      "at": "2026-11-14T01:42:59.359Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 1.094,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:59.359Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.68,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:59.359Z syncmove-redis",
+      "cpuPercent": 0.49,
+      "memoryMb": 6.914,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:42:59.359Z syncmove-db-primary",
+      "cpuPercent": 0.01,
+      "memoryMb": 104.4,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:01.394Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:01.394Z syncmove-app-2",
+      "cpuPercent": 0.02,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:01.394Z syncmove-app-1",
+      "cpuPercent": 0.01,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:43:01.394Z syncmove-sfu",
+      "cpuPercent": 0.23,
+      "memoryMb": 135.2,
+      "networkRxMb": 4.53,
+      "networkTxMb": 4.41
+    },
+    {
+      "at": "2026-11-14T01:43:01.394Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:01.394Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.69,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:01.394Z syncmove-redis",
+      "cpuPercent": 0.38,
+      "memoryMb": 6.914,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:01.394Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 104.4,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:03.420Z syncmove-nginx",
+      "cpuPercent": 0,
+      "memoryMb": 13.26,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:03.420Z syncmove-app-2",
+      "cpuPercent": 0.01,
+      "memoryMb": 119.5,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:03.420Z syncmove-app-1",
+      "cpuPercent": 0.02,
+      "memoryMb": 212.8,
+      "networkRxMb": 16.3,
+      "networkTxMb": 28.1
+    },
+    {
+      "at": "2026-11-14T01:43:03.420Z syncmove-sfu",
+      "cpuPercent": 0.09,
+      "memoryMb": 135.4,
+      "networkRxMb": 4.54,
+      "networkTxMb": 4.42
+    },
+    {
+      "at": "2026-11-14T01:43:03.420Z syncmove-db-failover",
+      "cpuPercent": 0,
+      "memoryMb": 0,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:03.420Z syncmove-db-replica",
+      "cpuPercent": 0.01,
+      "memoryMb": 79.69,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:03.420Z syncmove-redis",
+      "cpuPercent": 0.36,
+      "memoryMb": 6.914,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    },
+    {
+      "at": "2026-11-14T01:43:03.420Z syncmove-db-primary",
+      "cpuPercent": 0.02,
+      "memoryMb": 104.4,
+      "networkRxMb": 0,
+      "networkTxMb": 0
+    }
+  ],
+  "videoBandwidth": {
+    "status": "not measured: requires active WebRTC producers",
+    "note": "SFU container network samples are recorded above but are not attributed to video without a live media producer."
+  },
+  "recovery": {
+    "status": "available when post-run HTTP status is below 500; 3xx is an auth redirect, not an outage",
+    "health": 307
+  }
+}

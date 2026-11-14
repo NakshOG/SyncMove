@@ -12,6 +12,7 @@ A desktop-first, zero-knowledge E2EE video chat and messaging platform built wit
 - **Socket Security** - Clerk authentication, heartbeat, rate limiting, flood detection
 - **Distributed Real-Time** - Socket.IO + Redis adapter for multi-instance rooms, presence, and pub/sub fanout
 - **Zero-Knowledge Architecture** - Server cannot decrypt any user communications
+- **Server Branding** - Server logos are compressed public images stored as persistent database URLs; they are not E2EE content
 
 ## Tech Stack
 
@@ -24,10 +25,18 @@ A desktop-first, zero-knowledge E2EE video chat and messaging platform built wit
 - **File Storage**: UploadThing / S3-compatible storage
 - **WebRTC**: `@mediasoup/client` with all media routed through the SFU
 - **Encryption**: Web Crypto API (X3DH, Double Ratchet, AES-GCM)
+- **Key Recovery**: Password-encrypted local backup of identity keys and persisted sessions
 
 ## Architecture
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed system design documentation.
+
+Direct-message presence uses the authenticated Socket.IO connection and Redis-backed profile presence. Server member presence and DM presence both update online/offline state in realtime.
+
+## Study and verification
+
+- [STUDY-GUIDE.md](STUDY-GUIDE.md) — beginner-friendly explanation of the stack, message/file encryption, realtime flow, SFU calls, compression, and load testing, with short visual YouTube resources by topic.
+- [test-results/README.md](test-results/README.md) — individual test-file results, Docker measurements, adaptive breakpoint results, and interpretation of what passed.
 
 ## Quick Start
 

@@ -46,6 +46,7 @@ export const NavigationItem = ({ id, imageUrl, name }: NavigationItemProps) => {
               src={imageUrl}
               alt={name}
               sizes="48px"
+              unoptimized
               className="object-cover"
               onError={() => setImageFailed(true)}
             />

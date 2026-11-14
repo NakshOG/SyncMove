@@ -258,6 +258,7 @@ docker-compose -f docker-compose.sfu.yml restart
 - Socket.IO for WebSocket connections
 - Redis pub/sub for message fan-out
 - Channel presence tracking
+- Direct-message profile presence with Redis-backed online/offline events
 - Message acknowledgment
 
 ### 3. Audio/Video Calls (Mediasoup SFU)
@@ -325,7 +326,9 @@ npx prisma studio
 
 ## Known Limitations
 
-1. **Call Capacity:** Local dev (16GB RAM) supports up to 6 audio / 8 video participants
+1. **Call Capacity:** The SFU model supports a 100-participant conference target without mesh client upload growth; actual video capacity requires active WebRTC load testing and depends on bitrate, SFU egress, CPU, and network.
+2. **Server Branding:** Server images are compressed public UploadThing assets whose persistent URLs are stored in MariaDB; they are intentionally not encrypted like messages and files.
+3. **Key Recovery:** Identity keys and sessions can be exported to a password-encrypted JSON backup for moving to another device.
 2. **WebSockets:** Sticky sessions required for real-time coordination
 3. **Database:** Failover is automatic but requires replica promotion
 4. **File Upload:** Limited to UploadThing free tier

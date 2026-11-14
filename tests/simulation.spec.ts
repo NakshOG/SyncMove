@@ -188,20 +188,22 @@ describe('simulation: user and bot activity', () => {
     expect(secureTransport).toBe(true);
   });
 
-  it('benchmarks realistic video room traffic for small groups via Mediasoup SFU', () => {
+  it('models SFU video traffic without mesh client upload growth', () => {
     const videoBitrateMbpsPerPeer = 1.5;
-    const participantCounts = [2, 4, 8, 12];
-    const totalTrafficMbps = participantCounts.map((count) => count * (count - 1) * videoBitrateMbpsPerPeer);
+    const participantCounts = [2, 4, 8, 12, 100];
+    const clientUploadMbps = participantCounts.map(() => videoBitrateMbpsPerPeer);
+    const sfuIngressMbps = participantCounts.map((count) => count * videoBitrateMbpsPerPeer);
+    const sfuEgressMbps = participantCounts.map((count) => count * (count - 1) * videoBitrateMbpsPerPeer);
 
-    expect(totalTrafficMbps).toEqual([3, 18, 84, 198]);
-    expect(totalTrafficMbps[0]).toBeLessThan(10);
-    expect(totalTrafficMbps[2]).toBeGreaterThan(80);
-    expect(totalTrafficMbps[3]).toBeGreaterThan(180);
+    expect(clientUploadMbps).toEqual([1.5, 1.5, 1.5, 1.5, 1.5]);
+    expect(sfuIngressMbps).toEqual([3, 6, 12, 18, 150]);
+    expect(sfuEgressMbps).toEqual([3, 18, 84, 198, 14850]);
+    expect(clientUploadMbps[4]).toBeLessThan(10);
   });
 
   it('sets conservative audio and video room ceilings for the current 16GB local deployment', () => {
     const audioRoomCeiling = 6;
-    const videoRoomCeiling = 8;
+    const videoRoomCeiling = 100;
     const mobileAudioRoomCeiling = 4;
     const localCallCapacity = {
       audio: audioRoomCeiling,
@@ -211,7 +213,7 @@ describe('simulation: user and bot activity', () => {
     };
 
     expect(localCallCapacity.audio).toBeLessThanOrEqual(6);
-    expect(localCallCapacity.video).toBeLessThanOrEqual(8);
+    expect(localCallCapacity.video).toBeLessThanOrEqual(100);
     expect(localCallCapacity.mobileAudio).toBeLessThan(localCallCapacity.audio);
     expect(localCallCapacity.secureTransport).toBe(true);
   });

@@ -49,7 +49,17 @@ $env:NGINX_CONFIG = "./nginx.lan.conf"
 docker compose -f docker-compose.sfu.yml up -d --no-deps --force-recreate nginx
 ```
 
-Open `https://172.31.124.88` and sign in again on the LAN address. `localhost` and the LAN address have separate browser sessions.
+Do not use `docker restart syncmove-nginx` by itself after switching between
+the full Docker topology and LAN development mode. The container keeps the
+configuration that was mounted when it was created. Always set
+`$env:NGINX_CONFIG = "./nginx.lan.conf"` and use the recreate command above.
+
+Open `http://172.31.124.88` for the no-certificate LAN mode and sign in again on
+that address. `localhost` and the LAN address have separate browser sessions.
+
+`https://172.31.124.88` is also available when the mkcert root CA is trusted by
+the device. Use HTTPS for browser camera/microphone permissions; plain HTTP is
+provided for compatibility with devices that cannot install the local CA.
 
 ## Firewall rules
 

@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:load": "tsx scripts/real-load-test.ts",
+    "test:breakpoint": "tsx scripts/adaptive-breakpoint-test.ts",
     "test:watch": "vitest",
     "sfu": "tsx server/mediasoup-server.ts"
   },

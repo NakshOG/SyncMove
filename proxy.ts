@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 // UploadThing calls this endpoint server-to-server after the browser upload.
 // Its callback has a signed UploadThing payload rather than a Clerk browser
@@ -10,6 +11,16 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
+  // A secret-gated local load-test endpoint avoids Clerk redirect latency.
+  // This is disabled in production and does not bypass auth for normal routes.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.LOAD_TEST_SECRET &&
+    req.nextUrl.pathname === "/api/load-test" &&
+    req.headers.get("x-load-test-secret") === process.env.LOAD_TEST_SECRET
+  ) {
+    return NextResponse.next();
+  }
   if (!isPublicRoute(req)) {
     await auth.protect();
   }

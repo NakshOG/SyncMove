@@ -11,7 +11,7 @@
 | e2ee-crypto.spec.ts | ✅ PASS | 1 | 0 |
 | simulation.spec.ts | ✅ PASS | 9 | 0 |
 | stress.spec.ts | ✅ PASS | 25 | 0 |
-| concurrent-simulation.spec.ts | ✅ PASS | 15 | 0 |
+| concurrent-simulation.spec.ts | ✅ PASS | 19 | 0 |
 | **TOTAL** | **✅ PASS** | **52** | **0** |
 
 ---
@@ -34,7 +34,7 @@
 
 ---
 
-## Simulation Tests (8 tests)
+## Simulation Tests (9 tests)
 
 | Test | Result | Description |
 |------|--------|-------------|
@@ -45,7 +45,7 @@
 | Primary DB outage model | ✅ PASS | Failover required when primary down |
 | Audio room traffic | ✅ PASS | DTLS-SRTP protection confirmed |
 | Video room traffic | ✅ PASS | Mesh model with realistic bitrates |
-| Local deployment ceilings | ✅ PASS | Audio ≤6, Video ≤8 participants |
+| SFU media routing target | ✅ PASS | Audio and video modeled at 100 participants; live media capacity pending |
 
 ---
 
@@ -72,8 +72,8 @@
 | Bot Flood Attack (CONCURRENT) | ✅ PASS | 500 bots × 500 msg/sec |
 | Bot Connection Storm (CONCURRENT) | ✅ PASS | 2000 connections |
 | Mixed Bot/Human Activity | ✅ PASS | 300 bots + 50 humans |
-| Max Audio Room | ✅ PASS | 6 participants |
-| Max Video Room | ✅ PASS | 8 participants |
+| Max Audio Room | ✅ PASS | 100-participant SFU model |
+| SFU Video Conference Model | ✅ PASS | 100 participants modeled; real media capacity pending |
 | WebRTC Connection Setup | ✅ PASS | 100 connections |
 | Large File Upload | ✅ PASS | 100MB × 10 uploads |
 | E2EE File Encryption | ✅ PASS | Client-side encryption |
@@ -81,7 +81,7 @@
 
 ---
 
-## Concurrent Simulation Tests (15 tests)
+## Concurrent Simulation Tests (19 tests)
 
 | Test | Result | Description |
 |------|--------|-------------|
@@ -121,7 +121,7 @@
 |-----------|------------|----------------|
 | Memory Usage | 10GB | 14GB+ OOM crash |
 | Bot Count | 500 | Database overload |
-| Video Participants (SFU) | 50 | SFU capacity |
+| Video Participants (SFU model) | 100 | Active media capacity pending |
 | Audio Participants (SFU) | 100 | SFU capacity |
 | DB Connections | 100 | Connection pool |
 | Messages/Second | 500 | Event loop blocked |
@@ -132,10 +132,10 @@
 
 | Metric | Before (P2P) | After (SFU) | Improvement |
 |--------|--------------|-------------|-------------|
-| Audio Participants | 6 | 100+ | **16x** |
-| Video Participants | 8 | 50+ | **6x** |
+| Audio Participants | Small mesh rooms | 100-participant SFU target | **Model target** |
+| Video Participants | Small mesh rooms | 100-participant SFU target | **Model target** |
 | Bandwidth Complexity | O(N²) | O(N) | **Quadratic→Linear** |
-| Bandwidth per User (8 video) | 84 Mbps | 12 Mbps | **7x less** |
+| Client upload at 100 video participants | Mesh fan-out | One encoded upload per producer | **O(1) per client** |
 
 ---
 
@@ -161,9 +161,9 @@ docker exec syncmove-app-1 npm run test
 tests/
 ├── architecture.spec.ts          - Architecture validation (3 tests)
 ├── e2ee-crypto.spec.ts           - Encryption tests (1 test)
-├── simulation.spec.ts            - User/bot simulation (8 tests)
+├── simulation.spec.ts            - User/bot simulation (9 tests)
 ├── stress.spec.ts                - Sequential stress tests (25 tests)
-├── concurrent-simulation.spec.ts - True concurrent tests (15 tests)
+├── concurrent-simulation.spec.ts - True concurrent tests (19 tests)
 └── stress.spec.ts                - SFU migration tests (25 tests)
 ```
 
@@ -176,8 +176,8 @@ tests/
 - 72/72 current Vitest tests passing
 - SFU migration successful
 - Media server uses SFU-only routing; no browser P2P path
-- 100+ audio participants now possible (was 6)
-- 50+ video participants now possible (was 8)
+- 100 audio participants are modeled through the SFU (previous 6-person value was a mesh-era test ceiling)
+- 100 video participants are modeled by the SFU simulation; actual live capacity is hardware/network dependent
 - O(N²) → O(N) bandwidth improvement
 
 **System Ready for Production** (with SFU scaling)

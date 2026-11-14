@@ -70,6 +70,7 @@ export const ServerSidebar = async ({ serverId }: ServerSidebarProps) => {
           serverId={server.id}
           members={server.members}
           currentProfileId={profile.id}
+          inviteCode={server.inviteCode}
           currentRole={server.members.find((member) => member.profileId === profile.id)?.role ?? MemberRole.GUEST}
         />
       </ScrollArea>

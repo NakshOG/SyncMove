@@ -16,8 +16,10 @@ import { verifyToken } from "@clerk/nextjs/server";
 import {
   getRedisPubClient,
   getRedisSubClient,
+  getGlobalPresence,
   getServerPresence,
   isRedisEnabled,
+  setGlobalPresence,
   setServerPresence as setRedisServerPresence,
 } from "@/lib/redis";
 import { realtime } from "@/lib/realtime";
@@ -43,6 +45,7 @@ interface RateLimitState {
 const rateLimits = new Map<string, RateLimitState>();
 const userConnections = new Map<string, Set<string>>(); // userId -> socketIds
 const serverPresence = new Map<string, Map<string, { lastSeen: number; socketId: string }>>(); // serverId -> profileId -> presence
+const globalPresence = new Map<string, Set<string>>(); // profileId -> socketIds (local fallback)
 
 const PRESENCE_TTL_MS = 60_000;
 const PRESENCE_CLEANUP_INTERVAL_MS = 15_000;
@@ -299,6 +302,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
                 oldSocket?.disconnect();
                 userSockets.delete(oldest);
               }
+
+      if (socket.data.profileId) {
+        void updateGlobalPresence(socket.data.profileId as string, socket.id, false);
+        void emitGlobalPresence(io, [socket.data.profileId as string]);
+      }
             }
 
             console.log(`[socket] Authenticated: ${userId} (${socket.id})`);
@@ -450,6 +458,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseS
           .then(() => void emitServerPresence(io, serverId));
       });
 
+      socket.on("presence:identify", (profileId: string) => {
+        if (!isAuthenticated || !profileId) return;
+        socket.data.profileId = profileId;
+        void updateGlobalPresence(profileId, socket.id, true);
+        io.emit("presence:update", { profileId, online: true });
+      });
+
+      socket.on("presence:query", async (profileIds: string[]) => {
+        if (!isAuthenticated || !Array.isArray(profileIds)) return;
+        const ids = profileIds.filter((id): id is string => typeof id === "string" && id.length > 0);
+        const online = isRedisEnabled()
+          ? await getGlobalPresence(ids)
+          : ids.filter((id) => Boolean(globalPresence.get(id)?.size));
+        socket.emit("presence:snapshot", online);
+      });
+
       socket.on("leave-server", (serverId: string) => {
         if (!isAuthenticated || !serverId) return;
         void Promise.resolve(socket.leave(`server:${serverId}`))
@@ -528,6 +552,30 @@ async function updateServerPresence(
   }
 
   setLocalServerPresence(serverId, profileId, online, socketId, timestamp);
+}
+
+async function updateGlobalPresence(profileId: string, socketId: string, online: boolean) {
+  if (isRedisEnabled()) {
+    await setGlobalPresence(profileId, socketId, online);
+    return;
+  }
+  const sockets = globalPresence.get(profileId) ?? new Set<string>();
+  if (online) {
+    sockets.add(socketId);
+    globalPresence.set(profileId, sockets);
+  } else {
+    sockets.delete(socketId);
+    if (sockets.size === 0) globalPresence.delete(profileId);
+  }
+}
+
+async function emitGlobalPresence(io: SocketIOServer, profileIds: string[]) {
+  const online = isRedisEnabled()
+    ? await getGlobalPresence(profileIds)
+    : profileIds.filter((id) => Boolean(globalPresence.get(id)?.size));
+  for (const profileId of profileIds) {
+    io.emit("presence:update", { profileId, online: online.includes(profileId) });
+  }
 }
 
 function setLocalServerPresence(

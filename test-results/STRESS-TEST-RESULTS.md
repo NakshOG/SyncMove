@@ -27,7 +27,7 @@ After pushing your system to its maximum capacity with comprehensive stress test
 | OS | Windows |
 | Media Server | **Mediasoup SFU** (SFU-only routing) |
 | Max Audio | **100+ participants** (was 6) |
-| Max Video | **50+ participants** (was 8) |
+| Max Video | **100-participant SFU target** (model; live capacity pending) |
 
 ---
 
@@ -111,14 +111,16 @@ After pushing your system to its maximum capacity with comprehensive stress test
 
 | Test | Threshold | Breaking Point | Consequence |
 |------|-----------|----------------|-------------|
-| Max Audio Room | 6 participants | 1.92 Mbps | **Mesh bandwidth limit** |
-| Max Video Room | 8 participants | 84 Mbps | **Mesh bandwidth limit** |
+| Max Audio Room | 100-participant SFU model | Active media capacity pending | **SFU routing target** |
+| SFU Video Conference Target | 100 participants | 150 Mbps ingress; 14,850 Mbps aggregate egress model | **Requires real WebRTC media validation** |
 | WebRTC Setup | 100 connections | 250ms total | **Connection timeout** |
 
-**Breaking Point:** WebRTC mesh breaks at **8 video participants** (12 audio) because:
+**Historical mesh comparison:** WebRTC mesh becomes expensive around **8 video participants** because:
 - Each participant uploads to ALL other participants
 - Bandwidth scales quadratically: N×(N-1)×bitrate
-- 8 video participants = 8×7×1.5Mbps = 84 Mbps upload per user
+- 8 video participants = 8×7×1.5Mbps = 84 Mbps aggregate mesh upload model
+
+The current implementation uses a Mediasoup SFU. Each client uploads one video stream, so client upload is approximately O(1) per producer; the SFU forwards streams to subscribers, so aggregate SFU egress still grows with subscriptions. The 100-participant value is a modeled conference target, not a measured local video limit.
 - 12 audio participants = 12×11×64kbps = 8.448 Mbps per user
 
 **Architecture:** P2P Mesh (NOT SFU)
@@ -158,8 +160,8 @@ After pushing your system to its maximum capacity with comprehensive stress test
 | **Concurrent Connections** | 500 | 1000+ | 🟠 HIGH |
 | **Messages/Second** | 100 | 300+ | 🟠 HIGH |
 | **Database Connections** | 50 | 100+ | 🟠 HIGH |
-| **Audio Participants** | 4 | 6 | 🟡 MEDIUM |
-| **Video Participants** | 4 | 8 | 🟡 MEDIUM |
+| **Audio Participants** | 100 SFU model | Active media capacity pending | 🟡 MEDIUM |
+| **Video Participants** | 100 SFU model | Active media capacity pending | 🟡 MEDIUM |
 | **Bot Count** | 50 | 200+ | 🔴 CRITICAL |
 
 ---
@@ -196,7 +198,7 @@ Recovery: Implement connection pooling
 
 ### 5. 🟡 MEDIUM - WebRTC Mesh Limitations
 ```
-When: >8 video participants or >6 audio participants
+When: historical mesh comparison only; current audio and video routing uses the SFU model
 Symptoms: High bandwidth usage, call quality degrades
 Recovery: Use SFU (Selective Forwarding Unit) instead of mesh
 ```
@@ -210,7 +212,7 @@ Recovery: Use SFU (Selective Forwarding Unit) instead of mesh
 | Metric | Safe Limit | Notes |
 |--------|------------|-------|
 | Concurrent Users | 300 | 200 bots + 100 humans |
-| Active Call Participants | 4 video / 6 audio | Mesh model |
+| Active Call Participants | 100 audio / 100 video | SFU model; live media capacity pending |
 | Messages/Second | 100 | With rate limiting |
 | Database Connections | 50 | With connection pooling |
 | File Upload Size | 50MB | With chunking |
@@ -383,13 +385,13 @@ Recovery: Use SFU (Selective Forwarding Unit) instead of mesh
 Your system **will break** with:
 - 200+ bots spamming
 - 1000+ concurrent users
-- 8+ video participants
+- 100-participant SFU video target requires active media validation
 - 100+ concurrent database connections
 - 11GB+ memory allocation
 
 ### Current Capacity: ✅ Suitable for Small Teams
 
-- **Safe for:** 50-100 users, 20 bots, 4 video participants
+- **Safe for:** 50-100 users, 20 bots; 100 SFU video participants are modeled, not live-media verified
 - **Not safe for:** Public scaling, bot-heavy traffic, large calls
 
 ### Production Readiness: 🟡 60%
@@ -454,14 +456,14 @@ Your system will break when:
 
 1. **Memory exceeds 11GB** → OOM crash
 2. **Bots exceed 200** → Database overload  
-3. **Video participants exceed 8** → Network saturation
+3. **Live video capacity** → Must be measured with active WebRTC producers; the 100-participant value is a model target
 4. **Database connections exceed 100** → Pool exhaustion
 
 **Safe limits for production:**
 - 300 concurrent users
 - 200 msg/sec
-- 4 video participants
-- 6 audio participants
+- 100 SFU video participants modeled; active media capacity is not measured here
+- 100 audio participants modeled through the SFU; active media capacity is not measured here
 - 100 concurrent DB connections
 
 **Upgrade path to handle 1000+ users:**
@@ -518,7 +520,7 @@ This file contains **15 true concurrent simulation tests** that use `Promise.all
 Your system **will break** with:
 - 200+ bots spamming **concurrently**
 - 1000+ concurrent users
-- 8+ video participants
+- 100-participant SFU video target requires active media validation
 - 100+ concurrent database connections
 - 11GB+ memory allocation
 
@@ -547,7 +549,7 @@ Your system **will break** with:
 
 All tests are in:
 - `tests/stress.spec.ts` - 25 sequential stress tests
-- `tests/concurrent-simulation.spec.ts` - 15 true concurrent simulation tests
+- `tests/concurrent-simulation.spec.ts` - 19 true concurrent simulation tests
 - Run with: `npm run test tests/concurrent-simulation.spec.ts`
 
 **Test Coverage:**
@@ -587,7 +589,7 @@ Your system will break when:
 - 300 concurrent users
 - 200 msg/sec
 - 4 video participants
-- 6 audio participants
+- 100 audio participants modeled through the SFU; active media capacity is not measured here
 - 100 concurrent DB connections
 
 **Upgrade path to handle 1000+ users:**

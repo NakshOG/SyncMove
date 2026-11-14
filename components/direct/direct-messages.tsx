@@ -38,6 +38,7 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [onlineProfiles, setOnlineProfiles] = useState<string[]>([]);
   const notificationsEnabledRef = useRef(false);
   const { socket, isConnected } = useSocket();
   const searchParams = useSearchParams();
@@ -63,6 +64,28 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
       })
       .catch(() => setLoading(false));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+    const otherProfileIds = conversations.map((conversation) =>
+      conversation.memberOne.profile.id === profileId
+        ? conversation.memberTwo.profile.id
+        : conversation.memberOne.profile.id,
+    );
+    const update = ({ profileId, online }: { profileId: string; online: boolean }) =>
+      setOnlineProfiles((current) => online
+        ? [...new Set([...current, profileId])]
+        : current.filter((id) => id !== profileId));
+    const snapshot = (ids: string[]) => setOnlineProfiles(ids);
+    socket.emit("presence:identify", profileId);
+    socket.emit("presence:query", otherProfileIds);
+    socket.on("presence:snapshot", snapshot);
+    socket.on("presence:update", update);
+    return () => {
+      socket.off("presence:snapshot", snapshot);
+      socket.off("presence:update", update);
+    };
+  }, [conversations, isConnected, profileId, socket]);
 
   useEffect(() => {
     if (!selected) return;
@@ -167,7 +190,7 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
                         unoptimized
                         className="h-9 w-9 rounded-full object-cover"
                       />
-                      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#2b2d31] bg-[#23a559]" />
+                      <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#2b2d31] ${onlineProfiles.includes(other.id) ? "bg-[#23a559]" : "bg-[#747f8d]"}`} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
@@ -210,7 +233,7 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
             </h2>
             <p className="flex items-center gap-1 text-xs text-[#949ba4]">
               <Lock className="h-3 w-3 text-[#23a559]" />
-              Private conversation
+              {selectedProfile && (onlineProfiles.includes(selectedProfile.id) ? "Online" : "Offline")}
             </p>
           </div>
         </header>

@@ -29,11 +29,13 @@ export const MemberList = ({
   members,
   currentRole,
   currentProfileId,
+  inviteCode,
 }: {
   serverId: string;
   members: MemberItem[];
   currentRole: MemberRole;
   currentProfileId: string;
+  inviteCode: string;
 }) => {
   const router = useRouter();
   const { socket, isAuthenticated } = useSocket();
@@ -42,6 +44,9 @@ export const MemberList = ({
   ]);
   const [loading, setLoading] = useState(true);
   const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
   const canManage =
     currentRole === MemberRole.ADMIN || currentRole === MemberRole.MODERATOR;
 
@@ -80,11 +85,22 @@ export const MemberList = ({
   };
 
   const kick = async (memberId: string) => {
-    const response = await fetch(
-      `/api/servers/${serverId}/members/${memberId}`,
-      { method: "DELETE" },
-    );
-    if (response.ok) router.refresh();
+    if (removingMemberId) return;
+    setActionError(null);
+    setRemovingMemberId(memberId);
+    try {
+      const response = await fetch(
+        `/api/servers/${serverId}/members/${memberId}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) {
+        setActionError(await response.text() || "Unable to remove member");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setRemovingMemberId(null);
+    }
   };
 
   const startConversation = async (memberId: string) => {
@@ -96,6 +112,17 @@ export const MemberList = ({
     if (response.ok) {
       const conversation = (await response.json()) as { id: string };
       router.push(`/conversations?conversationId=${conversation.id}`);
+    }
+  };
+
+  const copyInvite = async () => {
+    const inviteUrl = `${window.location.origin}/invite/${inviteCode}`;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setInviteCopied(true);
+      window.setTimeout(() => setInviteCopied(false), 1500);
+    } catch {
+      window.prompt("Copy this invite link:", inviteUrl);
     }
   };
 
@@ -125,11 +152,8 @@ export const MemberList = ({
               align="end"
               className="bg-[#2b2d31] border-[#1f2023]"
             >
-              <DropdownMenuItem className="text-[#dbdee1] focus:bg-[#35373c]">
-                Invite via link
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-[#dbdee1] focus:bg-[#35373c]">
-                Invite via email
+              <DropdownMenuItem onClick={() => void copyInvite()} className="cursor-pointer text-[#dbdee1] focus:bg-[#35373c]">
+                {inviteCopied ? "Invite copied" : "Copy invite link"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -137,6 +161,11 @@ export const MemberList = ({
       </div>
 
       <div className="space-y-0.5">
+        {actionError && (
+          <p role="alert" className="mb-2 rounded-md bg-[#f23f42]/10 px-2 py-1 text-xs text-[#f23f42]">
+            {actionError}
+          </p>
+        )}
         {members.map((member) => (
           <div
             key={member.id}
@@ -227,12 +256,15 @@ export const MemberList = ({
                       : "Make moderator"}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-[#1f2023]" />
-                  <DropdownMenuItem
+                  {currentRole === MemberRole.ADMIN && (
+                    <DropdownMenuItem
+                    disabled={removingMemberId === member.id}
                     className="text-[#f23f42] focus:bg-[#35373c]"
                     onClick={() => void kick(member.id)}
                   >
-                    Remove member
-                  </DropdownMenuItem>
+                    {removingMemberId === member.id ? "Removing..." : "Remove member"}
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}

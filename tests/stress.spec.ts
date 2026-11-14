@@ -650,8 +650,8 @@ describe('STRESS TESTS - System Breaking Point Analysis', () => {
       });
     });
 
-    it('STRESS-021: Simulate max video room (8 participants)', () => {
-      const participants = 8;
+    it('STRESS-021: Simulate SFU conference target (100 participants)', () => {
+      const participants = 100;
       const bitrateMbps = 1.5; // 720p video
       const totalBandwidth = participants * (participants - 1) * bitrateMbps;
       
@@ -767,8 +767,8 @@ describe('STRESS TESTS - System Breaking Point Analysis', () => {
         {
           component: 'Mediasoup SFU',
           limit: 'Each user uploads to all others',
-          safeUsage: 'Max 6 audio / 8 video participants',
-          warning: 'Bandwidth exceeds client capacity'
+          safeUsage: 'Model 100 SFU video participants; validate with real WebRTC producers',
+          warning: 'SFU egress bandwidth or server/network capacity exceeded'
         }
       ];
 
@@ -777,7 +777,7 @@ describe('STRESS TESTS - System Breaking Point Analysis', () => {
         concurrentConnections: 1000,
         messagesPerSecond: 500,
         audioParticipants: 6,
-        videoParticipants: 8,
+        videoParticipants: 100,
         concurrentUploads: 20,
         databaseConnections: 100
       };

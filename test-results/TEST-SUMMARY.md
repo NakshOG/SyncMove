@@ -1,6 +1,6 @@
 # Comprehensive Test Results
 
-**Date:** November 13, 2026  
+**Date:** November 14, 2026
 **Project:** SyncMove  
 **Architecture:** Multi-node Docker deployment with failover
 
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-All 72 tests passed. The multi-node architecture is fully functional with:
+All 72 individual checks passed. The multi-node architecture is validated by the specific test groups below:
 - ✅ NGINX load balancing between 2 app nodes
 - ✅ Primary/MariaDB replica database configuration
 - ✅ Redis pub/sub for real-time coordination
@@ -22,7 +22,7 @@ All 72 tests passed. The multi-node architecture is fully functional with:
 
 ## Test Results Breakdown
 
-### 1. Architecture Tests (architecture.spec.ts) - 3 tests passed
+### 1. Architecture Tests (architecture.spec.ts) - 6 tests passed
 
 | Test | Status | Description |
 |------|--------|-------------|
@@ -47,7 +47,7 @@ All 72 tests passed. The multi-node architecture is fully functional with:
 | Primary DB outage model | ✅ PASS | Failover required when primary is down |
 | Audio room traffic | ✅ PASS | DTLS-SRTP protection confirmed |
 | Video room traffic | ✅ PASS | Mediasoup SFU with realistic bitrates |
-| Local deployment ceilings | ✅ PASS | Audio ≤6, Video ≤8 participants |
+| SFU video routing target | ✅ PASS | Models 100 participants without mesh client upload growth |
 | Max-stress local deployment | ✅ PASS | Busy local deployment: rooms, channels, DMs, uploads, message spam on actual core count |
 
 ---
@@ -102,8 +102,8 @@ NGINX configured with:
 
 | Component | Max Capacity |
 |-----------|--------------|
-| Audio room participants | 6 |
-| Video room participants | 8 |
+| Audio room participants | 100-participant SFU model |
+| Video room participants | 100-participant SFU model |
 | Concurrent users per server | 105 |
 | Concurrent uploads | 30 |
 | Messages/second burst | 3000 |

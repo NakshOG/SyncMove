@@ -53,6 +53,9 @@ interface UseE2EEReturn extends E2EEState {
 }
 
 export function useE2EE(): UseE2EEReturn {
+  const PEER_BUNDLE_CACHE_MS = 5 * 60 * 1000;
+  const peerBundleCache = useRef(new Map<string, { bundle: KeyBundle; expiresAt: number }>());
+  const peerBundleRequests = useRef(new Map<string, Promise<KeyBundle | null>>());
   const [state, setState] = useState<E2EEState>({
     initialized: false,
     hasKeyBundle: false,
@@ -186,6 +189,13 @@ export function useE2EE(): UseE2EEReturn {
    * Get a peer's key bundle from server
    */
   const getPeerBundle = useCallback(async (userId: string): Promise<KeyBundle | null> => {
+    const cached = peerBundleCache.current.get(userId);
+    if (cached && cached.expiresAt > Date.now()) return cached.bundle;
+
+    const pending = peerBundleRequests.current.get(userId);
+    if (pending) return pending;
+
+    const request = (async () => {
     try {
       const response = await fetch(`/api/keys/${userId}`);
       
@@ -198,12 +208,21 @@ export function useE2EE(): UseE2EEReturn {
       
       // Cache locally for offline access
       await bundleStorage.saveBundle(userId, JSON.stringify(data));
-
-      return deserializeKeyBundle(JSON.stringify(data));
+      const bundle = deserializeKeyBundle(JSON.stringify(data));
+      peerBundleCache.current.set(userId, { bundle, expiresAt: Date.now() + PEER_BUNDLE_CACHE_MS });
+      return bundle;
     } catch {
       // A missing/offline peer is expected in a group. The caller retries with
       // backoff; do not flood the console or expose transport details in UI.
       return null;
+    }
+    })();
+
+    peerBundleRequests.current.set(userId, request);
+    try {
+      return await request;
+    } finally {
+      peerBundleRequests.current.delete(userId);
     }
   }, []);
 

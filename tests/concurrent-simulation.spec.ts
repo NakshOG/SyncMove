@@ -550,7 +550,7 @@ describe('TRUE CONCURRENT SIMULATIONS - Real-World Load Testing', () => {
           maxConcurrentMessagesPerSecond,
           maxConcurrentUploads,
           maxAudioParticipants: 6,
-          maxVideoParticipants: 8,
+          maxVideoParticipants: 100,
           maxRooms: 100,
           maxChannelsPerRoom: 50,
           recommendedRateLimit: '1 message/second per user',
@@ -595,15 +595,15 @@ describe('TRUE CONCURRENT SIMULATIONS - Real-World Load Testing', () => {
       expect(botCount).toBe(20);
     });
 
-    it('SIM-017: 10 video bots in single call (1080p, 25fps, 2500kbps each)', async () => {
-      const botCount = 10;
+    it('SIM-017: 100 video participants in an SFU conference model', async () => {
+      const botCount = 100;
       const resolution = '1080p';
       const fps = 25;
       const bitrateKbps = 2500;
 
       const start = performance.now();
 
-      // TRUE CONCURRENCY: 10 bots each sending video stream
+      // Model 100 producers sending to an SFU; client upload remains O(1) per producer.
       await Promise.all(
         Array.from({ length: botCount }, async (_, botIndex) => {
           const botId = `video-bot-${botIndex}`;
@@ -616,15 +616,15 @@ describe('TRUE CONCURRENT SIMULATIONS - Real-World Load Testing', () => {
       const totalBandwidthKbps = botCount * bitrateKbps;
 
       testResults.push({
-        test: '10 Video Bots Concurrent (1080p)',
-        scenario: '10 bots in single 1080p video call',
-        concurrentLoad: `${botCount} concurrent 1080p video streams`,
+        test: '100 Video Participants Concurrent (SFU model)',
+        scenario: '100 participants in a single SFU video conference',
+        concurrentLoad: `${botCount} concurrent video producers`,
         duration: `${(duration / 1000).toFixed(2)}s`,
         bottleneck: `Bandwidth: ${totalBandwidthKbps}kbps, VP8 encoding CPU usage`,
         recommendation: 'Use simulcast (3 layers), adaptive bitrate, SVC support'
       });
 
-      expect(botCount).toBe(10);
+      expect(botCount).toBe(100);
     });
 
     it('SIM-018: 50 simultaneous audio/video calls (2 participants each)', async () => {

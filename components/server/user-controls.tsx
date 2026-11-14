@@ -22,6 +22,7 @@ export const UserControls = ({
   const { initialized, exportKeys, importKeys } = useE2EEContext();
 
   const publishAudioState = (nextMuted: boolean, nextDeafened: boolean) => {
+    window.localStorage.setItem("syncmove:audio-controls", JSON.stringify({ muted: nextMuted, deafened: nextDeafened }));
     window.dispatchEvent(new CustomEvent("syncmove:audio-controls", { detail: { muted: nextMuted, deafened: nextDeafened } }));
   };
 
@@ -116,6 +117,9 @@ export const UserControls = ({
             <p className="font-semibold text-white">Encryption keys</p>
             <p className="mt-1 text-[10px] text-[#949ba4]">
               {initialized ? "Stored on this device" : "Initializing..."}. The server never receives private keys.
+            </p>
+            <p className="mt-2 text-[10px] leading-relaxed text-[#949ba4]">
+              Export creates a password-encrypted backup of your identity key and saved sessions. Keep it offline; losing both this device and the backup can make old messages unreadable.
             </p>
             <input
               type="password"
