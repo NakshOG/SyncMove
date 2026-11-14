@@ -1,0 +1,242 @@
+services:
+  # All call media terminates at the Mediasoup SFU. No TURN service is used.
+  mediasoup-sfu:
+    build:
+      context: .
+      dockerfile: Dockerfile.sfu
+    container_name: syncmove-sfu
+    working_dir: /app/server
+    command: ["node", "--import", "tsx", "mediasoup-server.ts"]
+    ports:
+      - "3333:3333"
+      - "40000-40099:40000-40099/udp"
+    environment:
+      - MEDIASOUP_ANNOUNCED_IP=${MEDIASOUP_ANNOUNCED_IP:-172.31.124.88}
+      - MEDIASOUP_PORT=3333
+      - MEDIASOUP_RTC_MIN_PORT=40000
+      - MEDIASOUP_RTC_MAX_PORT=40099
+    networks:
+      - syncmove-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3333/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: syncmove-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${NGINX_CONFIG:-./nginx.conf}:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      app-node-1:
+        condition: service_healthy
+      app-node-2:
+        condition: service_healthy
+      mediasoup-sfu:
+        condition: service_healthy
+    networks:
+      - syncmove-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: syncmove-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - syncmove-network
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+
+  mariadb-primary:
+    image: mariadb:10.11
+    container_name: syncmove-db-primary
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: syncmove
+      MYSQL_USER: syncmove
+      MYSQL_PASSWORD: syncmovepass
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb-primary-data:/var/lib/mysql
+    networks:
+      - syncmove-network
+    restart: unless-stopped
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --server-id=1
+      --log-bin=mysql-bin
+      --gtid-strict-mode=ON
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -prootpassword --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  mariadb-replica:
+    image: mariadb:10.11
+    container_name: syncmove-db-replica
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: syncmove
+      MYSQL_USER: syncmove
+      MYSQL_PASSWORD: syncmovepass
+    ports:
+      - "3308:3306"
+    depends_on:
+      mariadb-primary:
+        condition: service_healthy
+    networks:
+      - syncmove-network
+    restart: unless-stopped
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --server-id=2
+      --log-bin=mysql-bin
+      --relay-log=/var/lib/mysql/mysql-relay-bin
+      --read-only=1
+      --gtid-strict-mode=ON
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -prootpassword --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  db-failover:
+    image: mariadb:10.11
+    container_name: syncmove-db-failover
+    depends_on:
+      mariadb-primary:
+        condition: service_healthy
+      mariadb-replica:
+        condition: service_healthy
+    environment:
+      PRIMARY_HOST: mariadb-primary
+      REPLICA_HOST: mariadb-replica
+      MYSQL_USER: root
+      MYSQL_PASSWORD: rootpassword
+      REPLICA_USER: replica
+      REPLICA_PASSWORD: replica
+    volumes:
+      - ./scripts:/scripts:rw
+    networks:
+      - syncmove-network
+    command: >
+      bash -c "chmod +x /scripts/*.sh 2>/dev/null || true; /scripts/db-failover.sh"
+    restart: unless-stopped
+
+  app-node-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args: &app-build-args
+        NEXT_PUBLIC_MEDIASOUP_URL: ${NEXT_PUBLIC_MEDIASOUP_URL:-ws://172.31.124.88:3333}
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+        NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_URL:-/sign-in}
+        NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL:-/sign-up}
+        NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL:-/}
+        NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL:-/}
+    container_name: syncmove-app-1
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: mysql://syncmove:syncmovepass@mariadb-primary:3306/syncmove
+      REPLICA_DATABASE_URL: mysql://syncmove:syncmovepass@mariadb-replica:3306/syncmove
+      REDIS_URL: redis://redis:6379
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_URL}
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL}
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL}
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL}
+      # This value is consumed by the browser, so it must resolve from the
+      # host, not from inside the Docker network.
+      NEXT_PUBLIC_MEDIASOUP_URL: ${NEXT_PUBLIC_MEDIASOUP_URL:-ws://172.31.124.88:3333}
+    depends_on:
+      mariadb-primary:
+        condition: service_healthy
+      mariadb-replica:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mediasoup-sfu:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+      - "3001:3000"
+    networks:
+      - syncmove-network
+    restart: unless-stopped
+    command: 'sh -c "npx prisma db push && npx prisma generate && npm run start"'
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+  app-node-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args: *app-build-args
+    container_name: syncmove-app-2
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: mysql://syncmove:syncmovepass@mariadb-primary:3306/syncmove
+      REPLICA_DATABASE_URL: mysql://syncmove:syncmovepass@mariadb-replica:3306/syncmove
+      REDIS_URL: redis://redis:6379
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_URL}
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL}
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL}
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL}
+      NEXT_PUBLIC_MEDIASOUP_URL: ${NEXT_PUBLIC_MEDIASOUP_URL:-ws://172.31.124.88:3333}
+    depends_on:
+      mariadb-primary:
+        condition: service_healthy
+      mariadb-replica:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mediasoup-sfu:
+        condition: service_healthy
+      app-node-1:
+        condition: service_healthy
+    ports:
+      - "3002:3000"
+    networks:
+      - syncmove-network
+    restart: unless-stopped
+    command: sh -c "npx prisma generate && npm run start"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+volumes:
+  mariadb-primary-data:
+
+networks:
+  syncmove-network:
+    driver: bridge

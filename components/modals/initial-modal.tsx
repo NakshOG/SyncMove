@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
-
+import axios from "axios";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,31 +19,23 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "../ui/button";
-import { useEffect, useState } from "react";
+import { FileUpload } from "../ui/file-upload";
 
 const formSchema = z.object({
   name: z.string().min(1, {
     message: "Server name is required.",
   }),
-
-  imageUrl: z.string().min(1, {
-    message: "Server image is required.",
-  }),
+  imageUrl: z.string().url("Upload a server image.").min(1, "Server image is required."),
 });
 
 export const InitialModal = () => {
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-
     defaultValues: {
       name: "",
       imageUrl: "",
@@ -53,36 +45,56 @@ export const InitialModal = () => {
   const isLoading = form.formState.isSubmitting;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    console.log(values);
-  };
+    try {
+      const response = await axios.post("/api/servers", {
+        ...values,
+      });
 
-  if (!isMounted) return null;
+      form.reset();
+      router.push(`/servers/${response.data.id}`);
+      router.refresh();
+    } catch (err) {
+      console.error("Error creating server:", err);
+    }
+  };
 
   return (
     <Dialog open>
-      <DialogContent className="bg-zinc-900 text-white p-0 overflow-hidden">
+      <DialogContent
+        showCloseButton={false}
+        className="bg-[#2b2d31] text-white p-0 overflow-hidden rounded-xl border border-white/5"
+      >
         <DialogHeader className="pt-8 px-6">
           <DialogTitle className="text-2xl text-center font-bold">
             Customize your server
           </DialogTitle>
 
-          <DialogDescription className="text-center text-zinc-400">
-            Give your server a name and image. You can change it later.
+          <DialogDescription className="text-center text-[#949ba4]">
+            Give your server a name. You can change it later.
           </DialogDescription>
         </DialogHeader>
 
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="px-6 pb-6"
-        >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 pb-6">
           <FieldGroup>
-            {/* SERVER NAME */}
+            <Controller
+              name="imageUrl"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FileUpload endpoint="ServerImage" value={field.value} onChange={field.onChange} />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
             <Controller
               name="name"
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel className="uppercase text-xs font-bold text-zinc-400">
+                  <FieldLabel
+                    htmlFor="server-name"
+                    className="uppercase text-xs font-bold text-[#949ba4]"
+                  >
                     Server name
                   </FieldLabel>
 
@@ -93,7 +105,7 @@ export const InitialModal = () => {
                     aria-invalid={fieldState.invalid}
                     autoComplete="off"
                     disabled={isLoading}
-                    className="bg-zinc-800/50 border-0 focus-visible:ring-0 text-white focus-visible:ring-offset-0 placeholder:text-zinc-500 caret-white"
+                    className="rounded-xl bg-[#383a40] border-0 focus-visible:ring-1 focus-visible:ring-[#5865f2] text-white placeholder:text-[#949ba4]"
                   />
 
                   {fieldState.invalid && (
@@ -102,14 +114,14 @@ export const InitialModal = () => {
                 </Field>
               )}
             />
-
           </FieldGroup>
 
-          <DialogFooter className="bg-zinc-800 px-6 py-4 rounded-lg mt-6">
+          <DialogFooter className="bg-[#232428] px-6 py-4 rounded-xl mt-6">
             <Button
               type="submit"
               variant="primary"
               disabled={isLoading}
+              className="rounded-xl"
             >
               Create
             </Button>

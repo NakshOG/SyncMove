@@ -1,18 +1,20 @@
-import 'dotenv/config';
-
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { PrismaClient } from '@/generated/prisma/client';
+
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error('Missing DATABASE_URL. Add it to your local .env before starting the app.');
+}
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-const adapter = new PrismaMariaDb(process.env.DATABASE_URL ?? '');
-
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
-    adapter,
+    adapter: new PrismaMariaDb(databaseUrl),
   });
 
 if (process.env.NODE_ENV !== 'production') {

@@ -1,23 +1,22 @@
 import type { Metadata } from "next";
-import { Open_Sans } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-
-const openSans = Open_Sans({
-  variable: "--font-open-sans",
-  subsets: ["latin"],
-});
+import { ModalProvider } from "@/components/providers/modal-provider";
+import { SocketProvider } from "@/components/providers/socket-provider";
+import { E2EEProvider } from "@/components/providers/e2ee-provider";
 
 export const metadata: Metadata = {
   title: "SyncMove",
-  description: "Your video chat app",
+  description: "End-to-end encrypted video chat app",
 };
 
 export default function RootLayout({
   children,
-}: LayoutProps<"/">) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <ClerkProvider>
       <html
@@ -26,19 +25,23 @@ export default function RootLayout({
         className={cn(
           "h-full",
           "antialiased",
-          openSans.variable,
           "font-sans"
         )}
       >
-        <body className="min-h-full flex flex-col">
+        <body className="h-full flex flex-col">
           <ThemeProvider
             attribute="class"
-            forcedTheme="dark"
-            enableSystem
+            defaultTheme="dark"
+            enableSystem={false}
             disableTransitionOnChange
             storageKey="SyncMove"
           >
-            {children}
+            <SocketProvider>
+              <E2EEProvider>
+                <ModalProvider/>
+                {children}
+              </E2EEProvider>
+            </SocketProvider>
           </ThemeProvider>
         </body>
       </html>
