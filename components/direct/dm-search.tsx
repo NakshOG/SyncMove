@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,26 +9,30 @@ type Conversation = { id: string; [key: string]: unknown };
 
 interface DMSearchProps {
   conversations: Conversation[];
+  profileId: string;
   onFilter: (filtered: Conversation[]) => void;
 }
 
-const RECENT_EMOJIS = ["??", "??", "??", "??", "??", "??", "??", "??", "??", "??", "??", "??", "?", "?", "??", "??"];
-
-export function DMSearch({ conversations, onFilter }: DMSearchProps) {
+export function DMSearch({ conversations, profileId, onFilter }: DMSearchProps) {
   const [query, setQuery] = useState("");
 
-  const filtered = useMemo(() => {
-    if (!query.trim()) return conversations;
-    const lower = query.toLowerCase();
-    return conversations.filter(c => {
-      // Filter by conversation id or any string property
-      return c.id.toLowerCase().includes(lower);
-    });
-  }, [conversations, query]);
-
-  useMemo(() => {
-    onFilter(filtered);
-  }, [filtered, onFilter]);
+  useEffect(() => {
+    const lower = query.trim().toLocaleLowerCase();
+    if (!lower) {
+      onFilter(conversations);
+      return;
+    }
+    onFilter(
+      conversations.filter((conversation) => {
+        const one = conversation.memberOne as { profile?: { name?: string } } | undefined;
+        const two = conversation.memberTwo as { profile?: { name?: string } } | undefined;
+        const otherName = one?.profile?.id === profileId
+          ? two?.profile?.name
+          : one?.profile?.name;
+        return Boolean(otherName?.toLocaleLowerCase().includes(lower));
+      }),
+    );
+  }, [conversations, onFilter, profileId, query]);
 
   return (
     <div className="relative mb-4">

@@ -156,6 +156,23 @@ io.on("connection", (socket) => {
       : [];
   });
 
+  // A client may finish its receive-transport setup after the live
+  // new-producer event was emitted. Provide an explicit resync so a video
+  // producer is never missed because of join timing.
+  handle<{ roomId: string }>(socket, "call:list-producers", ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room) return [];
+    return [...room.peers.entries()]
+      .filter(([peerSocketId]) => peerSocketId !== socket.id)
+      .flatMap(([peerSocketId, peer]) =>
+        [...peer.producers.values()].map((producer) => ({
+          producerId: producer.id,
+          kind: producer.kind,
+          socketId: peerSocketId,
+        })),
+      );
+  });
+
   handle<{ roomId: string; direction: "send" | "recv" }>(socket, "call:create-transport", async ({ direction }) => {
     const { room, peer } = requirePeer(socket);
 

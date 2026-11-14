@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Pencil, Pin, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,10 @@ import { useE2EEContext } from "@/components/providers/e2ee-provider";
 import { ChatMessagesSkeleton } from "./chat-messages-skeleton";
 import { ChatEmptyState } from "./chat-empty-state";
 import { RelativeTimestamp } from "@/components/ui/relative-timestamp";
+import {
+  getNotificationsEnabled,
+  playMessageNotificationSound,
+} from "@/lib/message-notification-sound";
 
 type ChatMessage = {
   id: string;
@@ -41,10 +45,26 @@ export const ChatMessages = ({
   const [decryptedCache] = useState<Map<string, string>>(new Map());
   const [decryptedContents, setDecryptedContents] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [memberIds, setMemberIds] = useState<string[]>([]);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const notificationsEnabledRef = useRef(false);
 
   const { socket, isConnected, isAuthenticated } = useSocket();
   const { decryptFromChannel, initialized, establishChannelSession } = useE2EEContext();
+
+  useEffect(() => {
+    const initial = getNotificationsEnabled();
+    notificationsEnabledRef.current = initial;
+    const update = (event: Event) => {
+      const enabled = (event as CustomEvent<{ enabled?: boolean }>).detail?.enabled;
+      if (typeof enabled === "boolean") {
+        notificationsEnabledRef.current = enabled;
+      }
+    };
+    window.addEventListener("syncmove:notifications", update);
+    return () => window.removeEventListener("syncmove:notifications", update);
+  }, []);
 
   const load = useCallback(
     async (before?: string) => {
@@ -54,7 +74,11 @@ export const ChatMessages = ({
         const response = await fetch(`/api/messages?${query.toString()}`, {
           cache: "no-store",
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          setLoadError(`Unable to load messages (${response.status})`);
+          setLoading(false);
+          return;
+        }
         const data = (await response.json()) as {
           messages: ChatMessage[];
           hasMore: boolean;
@@ -65,8 +89,10 @@ export const ChatMessages = ({
         setMessages((current) =>
           before ? [...data.messages, ...current] : data.messages,
         );
+        setLoadError(null);
         setLoading(false);
       } catch {
+        setLoadError("Unable to connect to the chat service");
         setLoading(false);
       }
     },
@@ -118,6 +144,12 @@ export const ChatMessages = ({
   }, [getDecryptedContent, initialized, messages]);
 
   useEffect(() => {
+    if (!loading && !searchQuery) {
+      bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    }
+  }, [loading, messages.length, searchQuery]);
+
+  useEffect(() => {
     const init = setTimeout(() => void load(), 0);
     const interval =
       !socket || !isConnected || !isAuthenticated
@@ -147,6 +179,30 @@ export const ChatMessages = ({
       message: ChatMessage;
     }) => {
       if (event.type === "created") {
+        const incoming = event.message.member.profileId !== profileId;
+        if (incoming && notificationsEnabledRef.current) playMessageNotificationSound();
+        if (
+          incoming &&
+          notificationsEnabledRef.current &&
+          document.hidden &&
+          "Notification" in window &&
+          Notification.permission === "granted"
+        ) {
+          const notification = new Notification(
+            `${event.message.member.profile.name} sent a message`,
+            {
+              body: event.message.encrypted
+                ? "New encrypted message"
+                : event.message.content.slice(0, 120),
+              tag: `syncmove-channel-${channelId}`,
+              icon: event.message.member.profile.imageUrl || undefined,
+            },
+          );
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
+        }
         setMessages((current) => {
           const found = current.some(
             (message) => message.id === event.message.id,
@@ -169,7 +225,7 @@ export const ChatMessages = ({
       socket.emit("leave-channel", channelId);
       socket.off("message-event", receive);
     };
-  }, [channelId, isAuthenticated, isConnected, socket]);
+  }, [channelId, isAuthenticated, isConnected, profileId, socket]);
 
   useEffect(() => {
     const receiveSearch = async (event: Event) => {
@@ -183,21 +239,35 @@ export const ChatMessages = ({
       }
 
       try {
+        if (initialized && memberIds.length > 0) {
+          await establishChannelSession(channelId, memberIds, profileId);
+        }
+        // Search the decrypted client view. The server stores encrypted
+        // messages as ciphertext and therefore cannot search their plaintext.
         const response = await fetch(
-          `/api/messages?channelId=${encodeURIComponent(channelId)}&q=${encodeURIComponent(query)}&limit=50`,
+          `/api/messages?channelId=${encodeURIComponent(channelId)}&limit=50`,
           { cache: "no-store" },
         );
         if (!response.ok) return;
         const data = (await response.json()) as { messages: ChatMessage[] };
 
-        const decrypted = await Promise.all(
+        const decrypted = (await Promise.all(
           data.messages.map(async (msg) => {
-            if (msg.encrypted && initialized) {
-              msg.content = await getDecryptedContent(msg);
+            if (!msg.encrypted) return { msg, content: msg.content };
+            if (!initialized) return null;
+            try {
+              const content = await decryptFromChannel(channelId, msg.content, profileId);
+              return content ? { msg, content } : null;
+            } catch {
+              return null;
             }
-            return msg;
           }),
-        );
+        ))
+          .filter((entry): entry is { msg: ChatMessage; content: string } => Boolean(entry))
+          .filter(({ msg, content }) =>
+            !msg.deleted && content.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+          )
+          .map(({ msg, content }) => ({ ...msg, content }));
         setSearchResults(decrypted);
       } catch {
         setSearchResults([]);
@@ -212,7 +282,7 @@ export const ChatMessages = ({
       window.removeEventListener("syncmove:channel-search", receiveSearch);
       window.removeEventListener("syncmove:show-pinned", receivePinned);
     };
-  }, [channelId, initialized, getDecryptedContent]);
+  }, [channelId, decryptFromChannel, establishChannelSession, getDecryptedContent, initialized, memberIds, profileId]);
 
   const remove = async (id: string) => {
     await fetch(`/api/messages/${id}`, { method: "DELETE" });
@@ -245,6 +315,20 @@ export const ChatMessages = ({
       <div className="flex h-0 min-h-0 flex-1 flex-col bg-transparent dark:bg-[#1e1f22]">
         <div className="h-0 min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-6">
           <ChatMessagesSkeleton />
+        </div>
+        <ChatInput channelId={channelId} onSent={() => void load()} />
+      </div>
+    );
+  }
+
+  if (loadError && messages.length === 0) {
+    return (
+      <div className="flex h-0 min-h-0 flex-1 flex-col bg-transparent dark:bg-[#1e1f22]">
+        <div className="flex h-0 min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-sm text-[#b5bac1]">
+          <p>{loadError}</p>
+          <Button variant="secondary" onClick={() => { setLoading(true); void load(); }}>
+            Retry
+          </Button>
         </div>
         <ChatInput channelId={channelId} onSent={() => void load()} />
       </div>
@@ -408,6 +492,7 @@ export const ChatMessages = ({
               </article>
             );
           })}
+          <div ref={bottomRef} aria-hidden="true" />
         </div>
       </div>
 

@@ -213,4 +213,4 @@ For questions about these tests, see:
 
 **Last Updated:** November 14, 2026  
 **Test Version:** Current Vitest suite  
-**Status:** All 37 tests passing ✅
+**Status:** Historical record; current suite is 72/72 tests passing ✅

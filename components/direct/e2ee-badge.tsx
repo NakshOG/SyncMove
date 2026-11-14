@@ -19,8 +19,8 @@ export function E2EEBadge({ className }: E2EEBadgeProps) {
       <Tooltip>
         <TooltipTrigger
           render={
-            <button
-              type="button"
+            <span
+              role="status"
               className={cn(
                 "flex items-center gap-1 rounded-full bg-[#23a559]/10 px-2 py-0.5",
                 className,
@@ -30,7 +30,7 @@ export function E2EEBadge({ className }: E2EEBadgeProps) {
               <span className="text-xs font-medium text-[#23a559]">
                 Encrypted
               </span>
-            </button>
+            </span>
           }
         />
         <TooltipContent>

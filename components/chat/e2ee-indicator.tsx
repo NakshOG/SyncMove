@@ -11,10 +11,11 @@ import { cn } from "@/lib/utils";
 
 interface E2EEIndicatorProps {
   initialized: boolean;
+  error?: string | null;
   className?: string;
 }
 
-export function E2EEIndicator({ initialized, className }: E2EEIndicatorProps) {
+export function E2EEIndicator({ initialized, error, className }: E2EEIndicatorProps) {
   return (
     <TooltipProvider>
       <Tooltip>
@@ -41,7 +42,7 @@ export function E2EEIndicator({ initialized, className }: E2EEIndicatorProps) {
         <TooltipContent>
           {initialized
             ? "Messages are end-to-end encrypted"
-            : "Messages are not encrypted yet"}
+            : error ?? "Messages are not encrypted yet"}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

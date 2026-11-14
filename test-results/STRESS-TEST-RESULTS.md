@@ -25,7 +25,7 @@ After pushing your system to its maximum capacity with comprehensive stress test
 | RAM | 16GB |
 | Node.js | Default heap (4GB) |
 | OS | Windows |
-| Media Server | **Mediasoup SFU** (replaced P2P mesh) |
+| Media Server | **Mediasoup SFU** (SFU-only routing) |
 | Max Audio | **100+ participants** (was 6) |
 | Max Video | **50+ participants** (was 8) |
 

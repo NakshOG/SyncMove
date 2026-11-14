@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 import { ChannelType } from "@/generated/prisma/enums";
 import { Input } from "@/components/ui/input";
+import {
+  getNotificationsEnabled,
+  setNotificationsEnabled as setNotificationsPreference,
+} from "@/lib/message-notification-sound";
 
 export const ChatHeader = ({
   name,
@@ -42,12 +46,19 @@ export const ChatHeader = ({
 
   useEffect(() => {
     const updatePermission = () => {
-      if ("Notification" in window) {
-        setNotificationsEnabled(Notification.permission === "granted");
-      }
+      setNotificationsEnabled(getNotificationsEnabled());
     };
     const frame = window.requestAnimationFrame(updatePermission);
     return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    const updatePreference = (event: Event) => {
+      const enabled = (event as CustomEvent<{ enabled?: boolean }>).detail?.enabled;
+      if (typeof enabled === "boolean") setNotificationsEnabled(enabled);
+    };
+    window.addEventListener("syncmove:notifications", updatePreference);
+    return () => window.removeEventListener("syncmove:notifications", updatePreference);
   }, []);
 
   useEffect(() => {
@@ -58,13 +69,12 @@ export const ChatHeader = ({
 
   const toggleNotifications = async () => {
     if (!("Notification" in window)) return;
-    if (Notification.permission === "default")
-      await Notification.requestPermission();
-    const enabled = Notification.permission === "granted";
-    setNotificationsEnabled(enabled);
-    window.dispatchEvent(
-      new CustomEvent("syncmove:notifications", { detail: { enabled } }),
-    );
+    if (notificationsEnabled) {
+      setNotificationsPreference(false);
+      return;
+    }
+    if (Notification.permission === "default") await Notification.requestPermission();
+    if (Notification.permission === "granted") setNotificationsPreference(true);
   };
 
   const togglePinned = () => {

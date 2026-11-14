@@ -16,9 +16,26 @@ export const ServerHeader = ({ server, role }: ServerHeaderProps) => {
   const { onOpen } = useModal();
   const router = useRouter();
   const copyInvite = async () => {
-    await navigator.clipboard.writeText(`${window.location.origin}/invite/${server.inviteCode}`);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
+    const inviteUrl = `${window.location.origin}/invite/${server.inviteCode}`;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(inviteUrl);
+      } else {
+        const input = document.createElement("textarea");
+        input.value = inviteUrl;
+        input.setAttribute("readonly", "true");
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        input.remove();
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      window.prompt("Copy this invite link:", inviteUrl);
+    }
   };
   const leave = async () => { if (!window.confirm("Leave this server?")) return; await fetch(`/api/servers/${server.id}/leave`, { method: "POST" }); router.push("/"); router.refresh(); };
   const remove = async () => { if (!window.confirm("Delete this server permanently?")) return; await fetch(`/api/servers/${server.id}`, { method: "DELETE" }); router.push("/"); router.refresh(); };

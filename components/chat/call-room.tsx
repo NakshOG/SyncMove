@@ -51,6 +51,25 @@ type RemoteStream = { socketId: string; stream: MediaStream };
 
 const MAX_VISIBLE_AVATARS = 5;
 
+function getMediasoupConnection(): { endpoint: string; path?: string } {
+  const configured = process.env.NEXT_PUBLIC_MEDIASOUP_URL;
+  if (typeof window === "undefined") return { endpoint: configured ?? "ws://localhost:3333" };
+
+  // A browser on another device must never resolve the SFU's localhost to
+  // itself. Replace localhost defaults with the host used for the app.
+  if (!configured || /localhost|127\.0\.0\.1/.test(configured)) {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    if (window.location.protocol === "https:") {
+      return { endpoint: `${protocol}//${window.location.host}`, path: "/sfu/socket.io" };
+    }
+    return { endpoint: `${protocol}//${window.location.hostname}:3333` };
+  }
+  if (window.location.protocol === "https:" && configured.startsWith("ws://")) {
+    return { endpoint: `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`, path: "/sfu/socket.io" };
+  }
+  return { endpoint: configured };
+}
+
 const normalizeParticipant = (
   member: Partial<Participant> & { id: string; name: string; imageUrl: string; socketId?: string },
 ): Participant => ({ ...member, socketId: member.socketId ?? member.id });
@@ -74,7 +93,7 @@ function getICEServers(): RTCIceServer[] {
 function request<T>(socket: Socket, event: string, payload: unknown): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     socket.timeout(10000).emit(event, payload, (err: Error | null, res: T & { error?: string }) => {
-      if (err) return reject(err);
+      if (err) return reject(new Error(`${event}: ${err.message || "operation timed out"}`));
       if (res && typeof res === "object" && "error" in res && res.error) return reject(new Error(res.error));
       resolve(res);
     });
@@ -92,15 +111,30 @@ const RemoteTile = ({
 }) => {
   const element = useRef<HTMLVideoElement>(null);
   const [imageFailed, setImageFailed] = useState(false);
-  const hasVideo = stream.getVideoTracks().length > 0;
+  const [hasVideo, setHasVideo] = useState(() => stream.getVideoTracks().length > 0);
 
   useEffect(() => {
+    const updateTracks = () => {
+      const hasRemoteVideo = stream.getVideoTracks().some((track) => track.readyState !== "ended");
+      setHasVideo(hasRemoteVideo);
+      if (element.current) {
+        element.current.srcObject = stream;
+        void element.current.play().catch(() => undefined);
+      }
+    };
+    updateTracks();
+    stream.addEventListener("addtrack", updateTracks);
+    stream.addEventListener("removetrack", updateTracks);
     if (element.current) {
       element.current.srcObject = stream;
       void element.current.play().catch(() => {
         // Playback can be blocked until the user interacts with the call UI.
       });
     }
+    return () => {
+      stream.removeEventListener("addtrack", updateTracks);
+      stream.removeEventListener("removetrack", updateTracks);
+    };
   }, [stream]);
 
   return (
@@ -157,6 +191,7 @@ export const CallRoom = ({
   const recvTransportRef = useRef<types.Transport | null>(null);
   const producersRef = useRef<Map<string, types.Producer>>(new Map()); // kind -> producer
   const consumersRef = useRef<Map<string, types.Consumer>>(new Map()); // producerId -> consumer
+  const pendingProducersRef = useRef<Map<string, string>>(new Map());
   const remoteTracksRef = useRef<Map<string, { socketId: string; track: MediaStreamTrack }>>(new Map());
   const remoteMediaRef = useRef<Map<string, MediaStream>>(new Map()); // socketId -> stream
   const listenersRef = useRef<{
@@ -195,8 +230,14 @@ export const CallRoom = ({
       consumersRef.current.delete(producerId);
       const stream = remoteMediaRef.current.get(entry.socketId);
       if (stream) {
-        stream.removeTrack(entry.track);
-        if (stream.getTracks().length === 0) remoteMediaRef.current.delete(entry.socketId);
+        const remainingTracks = stream.getTracks().filter((track) => track !== entry.track);
+        if (remainingTracks.length === 0) {
+          remoteMediaRef.current.delete(entry.socketId);
+        } else {
+          // Replace the object so React and the media element observe the
+          // changed audio/video track set immediately.
+          remoteMediaRef.current.set(entry.socketId, new MediaStream(remainingTracks));
+        }
       }
       publishRemoteStreams();
     },
@@ -226,6 +267,7 @@ export const CallRoom = ({
       consumersRef.current.clear();
       remoteTracksRef.current.clear();
       remoteMediaRef.current.clear();
+      pendingProducersRef.current.clear();
       sendTransportRef.current?.close();
       recvTransportRef.current?.close();
       sendTransportRef.current = null;
@@ -259,8 +301,9 @@ export const CallRoom = ({
   useEffect(() => {
     let disposed = false;
     let poll: number | null = null;
-    const endpoint = process.env.NEXT_PUBLIC_MEDIASOUP_URL ?? "ws://localhost:3333";
-    const previewSocket = io(endpoint, {
+    const mediaConnection = getMediasoupConnection();
+    const previewSocket = io(mediaConnection.endpoint, {
+      path: mediaConnection.path,
       autoConnect: false,
       transports: ["websocket", "polling"],
       reconnection: true,
@@ -270,7 +313,6 @@ export const CallRoom = ({
       if (!disposed) setPresent(mergeParticipants(members));
     };
     previewSocket.on("call-presence", onPresence);
-    socketRef.current = previewSocket;
 
     void new Promise<void>((resolve, reject) => {
       previewSocket.once("connect", () => resolve());
@@ -295,8 +337,9 @@ export const CallRoom = ({
       disposed = true;
       if (poll) window.clearInterval(poll);
       previewSocket.off("call-presence", onPresence);
-      previewSocket.disconnect();
-      if (socketRef.current === previewSocket) socketRef.current = null;
+      if (previewSocket.connected || previewSocket.active) {
+        previewSocket.disconnect();
+      }
     };
   }, [currentParticipant, roomId]);
 
@@ -322,8 +365,11 @@ export const CallRoom = ({
         consumersRef.current.set(producerId, consumer);
         remoteTracksRef.current.set(producerId, { socketId, track: consumer.track });
 
-        const stream = remoteMediaRef.current.get(socketId) ?? new MediaStream();
-        stream.addTrack(consumer.track);
+        const previousStream = remoteMediaRef.current.get(socketId);
+        const stream = new MediaStream([
+          ...(previousStream?.getTracks() ?? []),
+          consumer.track,
+        ]);
         remoteMediaRef.current.set(socketId, stream);
         publishRemoteStreams();
 
@@ -347,10 +393,11 @@ export const CallRoom = ({
     setCallError(null);
 
     try {
-      const endpoint = process.env.NEXT_PUBLIC_MEDIASOUP_URL ?? "ws://localhost:3333";
+      const mediaConnection = getMediasoupConnection();
       let sock = socketRef.current;
       if (!sock) {
-        sock = io(endpoint, {
+        sock = io(mediaConnection.endpoint, {
+          path: mediaConnection.path,
           autoConnect: false,
           transports: ["websocket", "polling"],
           reconnection: false,
@@ -382,7 +429,13 @@ export const CallRoom = ({
       const self = normalizeParticipant({ ...currentParticipant, socketId: `local:${currentParticipant.id}` });
       sock.off("call-presence");
       listenersRef.current = {
-        onNewProducer: ({ producerId, socketId }) => void consumeProducer(producerId, socketId),
+        onNewProducer: ({ producerId, socketId }) => {
+          if (!deviceRef.current || !recvTransportRef.current) {
+            pendingProducersRef.current.set(producerId, socketId);
+            return;
+          }
+          void consumeProducer(producerId, socketId);
+        },
         onProducerClosed: ({ producerId }) => removeRemoteTrack(producerId),
         onPresence: (members) => {
           const others = members.filter((m) => m.id !== self.id && m.socketId !== self.socketId);
@@ -429,6 +482,22 @@ export const CallRoom = ({
           .catch(errback);
       });
       recvTransportRef.current = recv;
+
+      // A producer can be announced while this client is still creating its
+      // receive transport. Consume those announcements after the transport is
+      // ready instead of silently dropping (usually video) tracks.
+      const pendingProducers = [...pendingProducersRef.current.entries()];
+      pendingProducersRef.current.clear();
+      for (const [producerId, socketId] of pendingProducers) {
+        await consumeProducer(producerId, socketId);
+      }
+
+      // Resync after the receive transport exists. This closes the timing
+      // gap where a remote video producer was announced during join/setup.
+      const currentProducers = await request<JoinResponse["existingProducers"]>(sock, "call:list-producers", { roomId });
+      for (const producer of currentProducers) {
+        await consumeProducer(producer.producerId, producer.socketId);
+      }
 
       // 5. Publish local tracks.
       const audioTrack = media.getAudioTracks()[0];

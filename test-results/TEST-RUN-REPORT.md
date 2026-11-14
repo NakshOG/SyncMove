@@ -109,7 +109,7 @@
 |-----------|--------|-------|
 | Mediasoup SFU Server | ✅ Created | WebSocket signaling server |
 | Mediasoup Client | ✅ Created | @mediasoup/client integration |
-| Call Room UI | ✅ Updated | Uses SFU instead of P2P mesh |
+| Call Room UI | ✅ Updated | Uses SFU-only routing; no browser P2P path |
 | Docker Compose | ✅ Created | docker-compose.sfu.yml |
 | API Routes | ✅ Created | /api/calls endpoints |
 
@@ -175,7 +175,7 @@ tests/
 
 - 72/72 current Vitest tests passing
 - SFU migration successful
-- Media server replaced P2P mesh
+- Media server uses SFU-only routing; no browser P2P path
 - 100+ audio participants now possible (was 6)
 - 50+ video participants now possible (was 8)
 - O(N²) → O(N) bandwidth improvement

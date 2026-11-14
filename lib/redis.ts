@@ -10,6 +10,13 @@ const state = globalThis as typeof globalThis & {
   __syncmoveRedisSubscriber?: RedisClientType;
 };
 
+function attachRedisErrorHandler(client: RedisClientType, label: string) {
+  client.on("error", (error) => {
+    console.error(`[redis:${label}]`, error instanceof Error ? error.message : error);
+  });
+  return client;
+}
+
 export const getRedisUrl = () => process.env.REDIS_URL ?? "";
 export const isRedisEnabled = () => Boolean(getRedisUrl());
 
@@ -21,7 +28,7 @@ export async function getRedisClient(): Promise<RedisClientType | null> {
   }
 
   if (!state.__syncmoveRedisClient) {
-    state.__syncmoveRedisClient = createClient({ url: redisUrl });
+    state.__syncmoveRedisClient = attachRedisErrorHandler(createClient({ url: redisUrl }), "client");
     await state.__syncmoveRedisClient.connect();
   }
 
@@ -40,7 +47,7 @@ export async function getRedisSubClient(): Promise<RedisClientType | null> {
   }
 
   if (!state.__syncmoveRedisSubscriber) {
-    state.__syncmoveRedisSubscriber = createClient({ url: redisUrl });
+    state.__syncmoveRedisSubscriber = attachRedisErrorHandler(createClient({ url: redisUrl }), "subscriber");
     await state.__syncmoveRedisSubscriber.connect();
   }
 

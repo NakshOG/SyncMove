@@ -71,6 +71,9 @@ export function useE2EE(): UseE2EEReturn {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
+      if (typeof window !== "undefined" && !window.isSecureContext) {
+        throw new Error("E2EE requires HTTPS on LAN; localhost is the only HTTP exception");
+      }
       const storedIdentity = await keyStorage.getKey("identity");
       const storedSignedPreKey = await keyStorage.getKey("signed-pre-key");
 

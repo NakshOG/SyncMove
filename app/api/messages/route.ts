@@ -25,7 +25,12 @@ export async function GET(req: Request) {
     where: {
       channelId,
       ...(before ? { CreatedAt: { lt: new Date(before) } } : {}),
-      ...(query ? { content: { contains: query } } : {}),
+      ...(query
+        ? {
+            deleted: false,
+            content: { contains: query },
+          }
+        : {}),
     },
     orderBy: { CreatedAt: "desc" },
     take: limit,

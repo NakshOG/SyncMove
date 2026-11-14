@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { useSocket } from "@/components/providers/socket-provider";
@@ -10,6 +10,10 @@ import { MessageCircle, Lock } from "lucide-react";
 import { DMSearch } from "./dm-search";
 import { DMListSkeleton } from "./dm-list-skeleton";
 import { E2EEBadge } from "./e2ee-badge";
+import {
+  getNotificationsEnabled,
+  playMessageNotificationSound,
+} from "@/lib/message-notification-sound";
 
 type Conversation = {
   id: string;
@@ -21,7 +25,7 @@ type DirectMessage = {
   content: string;
   encrypted: boolean;
   CreatedAt: string;
-  member: { profile: { name: string; imageUrl: string } };
+  member: { profileId: string; profile: { name: string; imageUrl: string } };
 };
 
 export const DirectMessages = ({ profileId }: { profileId: string }) => {
@@ -34,8 +38,19 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [sendError, setSendError] = useState<string | null>(null);
+  const notificationsEnabledRef = useRef(false);
   const { socket, isConnected } = useSocket();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    notificationsEnabledRef.current = getNotificationsEnabled();
+    const update = (event: Event) => {
+      const enabled = (event as CustomEvent<{ enabled?: boolean }>).detail?.enabled;
+      if (typeof enabled === "boolean") notificationsEnabledRef.current = enabled;
+    };
+    window.addEventListener("syncmove:notifications", update);
+    return () => window.removeEventListener("syncmove:notifications", update);
+  }, []);
 
   useEffect(() => {
     fetch("/api/conversations")
@@ -69,6 +84,9 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
 
     const receive = (event: { type: "created"; message: DirectMessage }) => {
       if (event.type === "created") {
+        if (event.message.member.profileId !== profileId && notificationsEnabledRef.current) {
+          playMessageNotificationSound();
+        }
         setMessages((current) =>
           current.some((item) => item.id === event.message.id)
             ? current
@@ -124,6 +142,7 @@ export const DirectMessages = ({ profileId }: { profileId: string }) => {
           <>
             <DMSearch
               conversations={conversations}
+              profileId={profileId}
               onFilter={setFilteredConversations}
             />
 

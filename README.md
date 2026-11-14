@@ -237,3 +237,37 @@ The supported SFU stack is `docker-compose.sfu.yml` with Mediasoup UDP ports
 Private E2EE identity keys and sessions are stored in IndexedDB; export a
 password-protected backup from User Controls before clearing site data or
 moving to another device.
+
+### LAN access with E2EE
+
+LAN E2EE requires HTTPS because browsers do not expose `crypto.subtle` to a
+plain `http://172.x.x.x` origin. Install `mkcert`, generate a local certificate,
+and start NGINX:
+
+```powershell
+winget install FiloSottile.mkcert
+.\scripts\generate-local-cert.ps1 -LanIp 172.31.124.88
+docker compose -f docker-compose.sfu.yml up -d --build
+```
+
+Open `https://172.31.124.88` on the host and other LAN devices. Install the
+mkcert root CA on each device so the browser trusts the certificate. Do not use
+`0.0.0.0` as the browser URL; it is only a bind address.
+
+For LAN calls, the SFU must also announce the host LAN address. The current
+local example uses `172.31.124.88` for signaling and Mediasoup ICE candidates.
+If the host receives a different DHCP address, update `NEXT_PUBLIC_MEDIASOUP_URL`
+and `MEDIASOUP_ANNOUNCED_IP` in `.env`, then restart the SFU and app.
+
+If you are running only `npm run dev` on Windows and only the NGINX container,
+use the LAN-development NGINX configuration. It proxies to the Windows host
+instead of Docker app-node names:
+
+```powershell
+$env:NGINX_CONFIG = "./nginx.lan.conf"
+docker compose -f docker-compose.sfu.yml up -d --no-deps nginx
+```
+
+Keep the Next.js process running with `npm run dev -- --hostname 0.0.0.0`.
+For the complete Docker topology, clear `NGINX_CONFIG` and use the default
+`nginx.conf` with `app-node-1` and `app-node-2`.
